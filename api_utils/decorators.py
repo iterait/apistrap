@@ -22,14 +22,16 @@ class autodoc:
             "responses": {}
         }
 
-        wrapped_func.specs_dict["parameters"] = [
-            {
-                "in": "path",
-                "name": arg.name,
-                "type": self.type_map.get(arg.annotation, None)
-            }
-            for arg in sig.parameters.values()
-            if arg.name not in self.ignored_args
-        ]
+        for arg in sig.parameters.values():
+            if arg.name not in self.ignored_args:
+                param_data = {
+                    "in": "path",
+                    "name": arg.name
+                }
+
+                if arg.annotation in self.type_map:
+                    param_data["type"] = self.type_map[arg.annotation]
+
+                wrapped_func.specs_dict["parameters"].append(param_data)
 
         return wrapped_func
