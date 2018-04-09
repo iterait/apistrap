@@ -3,7 +3,7 @@ from typing import Type
 from flasgger import Swagger as Flasgger
 from schematics import Model
 
-from api_utils.decorators import AutodocDecorator, RespondsWithDecorator
+from api_utils.decorators import AutodocDecorator, RespondsWithDecorator, AcceptsDecorator
 
 
 class Swagger(Flasgger):
@@ -17,6 +17,9 @@ class Swagger(Flasgger):
 
     def responds_with(self, response_class: Type[Model], *, code=200):
         return RespondsWithDecorator(self, response_class, code=code)
+
+    def accepts(self, request_class: Type[Model]):
+        return AcceptsDecorator(self, request_class)
 
     def add_definition(self, name, schema):
         definition_prefix = "#/definitions/"

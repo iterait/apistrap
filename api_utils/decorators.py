@@ -1,8 +1,13 @@
+from functools import wraps
 from inspect import signature
 from typing import Type
+
+from flask import request
 from schematics import Model
+from schematics.exceptions import DataError
 
 import api_utils.flask
+from api_utils.errors import ApiClientError, InvalidFieldsError
 from api_utils.schematics_utils import schema_object_for_model
 
 
@@ -68,3 +73,54 @@ class RespondsWithDecorator:
 
     def _get_schema_object(self):
         return schema_object_for_model(self.response_class)
+
+
+class AcceptsDecorator:
+    """
+    A decorator that validates request bodies against a schema and passes it as an argument to the view function.
+    The destination argument must be annotated with the request type.
+    """
+
+    def __init__(self, swagger: 'api_utils.flask.Swagger', request_class: Type[Model]):
+        self.swagger = swagger
+        self.request_class = request_class
+
+    def __call__(self, wrapped_func):
+        _ensure_specs_dict(wrapped_func)
+
+        wrapped_func.specs_dict["parameters"].append({
+            "in": "body",
+            "name": "body",
+            "required": True,
+            "schema": {
+                "$ref": self.swagger.add_definition(self.request_class.__name__, schema_object_for_model(self.request_class))
+            }
+        })
+
+        sig = signature(wrapped_func)
+        request_arg = next(filter(lambda arg: issubclass(self.request_class, arg.annotation), sig.parameters.values()), None)
+
+        if request_arg is None:
+            raise TypeError("no argument of type {} found".format(self.request_class))
+
+        @wraps(wrapped_func)
+        def wrapper(*args, **kwargs):
+            if request.content_type != "application/json":
+                raise ApiClientError("Unsupported media type")
+
+            bound_args = sig.bind_partial(*args, **kwargs)
+            if request_arg.name not in bound_args.arguments:
+                request_object = self.request_class.__new__(self.request_class)
+
+                try:
+                    request_object.__init__(request.json, validate=True, partial=False, strict=True)
+                except DataError as e:
+                    raise InvalidFieldsError(e.errors) from e
+
+                new_kwargs = {request_arg.name: request_object}
+                new_kwargs.update(**kwargs)
+                kwargs = new_kwargs
+
+            return wrapped_func(*args, **kwargs)
+
+        return wrapper
