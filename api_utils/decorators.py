@@ -1,6 +1,6 @@
 from functools import wraps
 from inspect import signature
-from typing import Type
+from typing import Type, Sequence
 
 from flask import request
 from schematics import Model
@@ -124,3 +124,18 @@ class AcceptsDecorator:
             return wrapped_func(*args, **kwargs)
 
         return wrapper
+
+
+class TagsDecorator:
+    """
+    A decorator that adds tags to the OpenAPI specification of the decorated view function.
+    """
+
+    def __init__(self, tags: Sequence[str]):
+        self.tags = tags
+
+    def __call__(self, wrapped_func):
+        _ensure_specs_dict(wrapped_func)
+        wrapped_func.specs_dict.setdefault("tags", [])
+        wrapped_func.specs_dict["tags"].extend(self.tags)
+        return wrapped_func
