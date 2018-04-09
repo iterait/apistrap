@@ -11,7 +11,10 @@ def app():
     app.config["TESTING"] = True
     app.config["SECRET_KEY"] = "TEST-SECRET"
 
-    Swagger(app)
-
     with app.app_context():
         yield app
+
+
+@pytest.fixture(scope='function')
+def swagger(app):
+    yield Swagger(app)

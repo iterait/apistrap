@@ -1,18 +1,16 @@
 import pytest
 from flask import jsonify
 
-from api_utils.decorators import autodoc
-
 
 @pytest.fixture()
-def app_basic(app):
+def app_basic(app, swagger):
     @app.route("/")
-    @autodoc()
+    @swagger.autodoc()
     def view():
         return jsonify()
 
     @app.route("/view/<param>/<typed_param>")
-    @autodoc()
+    @swagger.autodoc()
     def view_with_params(param, typed_param: int):
         return jsonify()
 
