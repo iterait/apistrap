@@ -12,6 +12,22 @@ class Swagger(Flasgger):
         config.setdefault("definitions", {})
         super().__init__(app, config)
 
+    @property
+    def title(self):
+        return self.config.get("title")
+
+    @title.setter
+    def title(self, title):
+        self.config["title"] = title
+
+    @property
+    def description(self):
+        return self.config.get("description")
+
+    @description.setter
+    def description(self, description):
+        self.config["description"] = description
+
     def autodoc(self, *, ignored_args=()):
         return AutodocDecorator(self, ignored_args=ignored_args)
 
