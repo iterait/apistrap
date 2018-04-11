@@ -19,6 +19,13 @@ def _ensure_specs_dict(func):
         }
 
 
+def _add_ignored_param(func, arg: str):
+    if not hasattr(func, "_ignored_params"):
+        setattr(func, "_ignored_params", [])
+
+    func._ignored_params.append(arg)
+
+
 class AutodocDecorator:
     """
     A decorator that generates Swagger metadata based on the signature of the decorated function and black magic.
@@ -36,9 +43,11 @@ class AutodocDecorator:
     def __call__(self, wrapped_func):
         _ensure_specs_dict(wrapped_func)
         sig = signature(wrapped_func)
+        ignored = list(self.ignored_args)
+        ignored += getattr(wrapped_func, "_ignored_params", [])
 
         for arg in sig.parameters.values():
-            if arg.name not in self.ignored_args:
+            if arg.name not in ignored:
                 param_data = {
                     "in": "path",
                     "name": arg.name
@@ -123,6 +132,7 @@ class AcceptsDecorator:
 
             return wrapped_func(*args, **kwargs)
 
+        _add_ignored_param(wrapper, request_arg.name)
         return wrapper
 
 

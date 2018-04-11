@@ -97,3 +97,22 @@ def test_invalid_field(app_with_accepts, client: Client):
             "string_field": "foo",
             "int_field": "Hello"
         }))
+
+
+@pytest.fixture()
+def app_with_arg(app, swagger):
+    @app.route("/<arg>", methods=["POST"])
+    @swagger.autodoc()
+    @swagger.accepts(Request)
+    def view(arg, req: Request):
+        assert req.string_field == "foo"
+        assert req.int_field == 42
+        return jsonify()
+
+
+def test_correct_parameters(app_with_arg, client: Client):
+    response = client.get("/apispec_1.json")
+    path = response.json["paths"]["/{arg}"]["post"]
+    assert len(path["parameters"]) == 2
+    assert next(filter(lambda item: item["in"] == "body", path["parameters"]), None) is not None
+    assert next(filter(lambda item: item["in"] == "path", path["parameters"]), None) is not None
