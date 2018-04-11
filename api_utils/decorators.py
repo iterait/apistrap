@@ -1,13 +1,13 @@
-from functools import wraps
+from functools import wraps, WRAPPER_ASSIGNMENTS
 from inspect import signature
 from typing import Type, Sequence
 
-from flask import request
+from flask import request, jsonify, Response
 from schematics import Model
 from schematics.exceptions import DataError
 
 import api_utils.flask
-from api_utils.errors import ApiClientError, InvalidFieldsError
+from api_utils.errors import ApiClientError, InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
 from api_utils.schematics_utils import schema_object_for_model
 
 
@@ -24,6 +24,19 @@ def _add_ignored_param(func, arg: str):
         setattr(func, "_ignored_params", [])
 
     func._ignored_params.append(arg)
+
+
+def _get_wrapped_function(func):
+    """
+    Get the actual function from a decorated function. This could end up in a loop on horribly mangled functions.
+    """
+
+    wrapped = getattr(func, "__wrapped__", None)
+
+    if wrapped is None:
+        return func
+
+    return _get_wrapped_function(wrapped)
 
 
 class AutodocDecorator:
@@ -63,7 +76,14 @@ class AutodocDecorator:
 
 class RespondsWithDecorator:
     """
-    A decorator that fills in response schemas in the Swagger specification.
+    A decorator that fills in response schemas in the Swagger specification. It also converts Schematics models returned
+    by view functions to JSON and validates them.
+    """
+
+    outermost_decorators = {}
+    """
+    Maps functions to the outermost RespondsWithDecorator so that we can perform checks for unknown response classes 
+    when we get to the last decorator
     """
 
     def __init__(self, swagger: 'api_utils.flask.Swagger', response_class: Type[Model], *, code=200):
@@ -78,7 +98,31 @@ class RespondsWithDecorator:
             "$ref": self.swagger.add_definition(self.response_class.__name__, self._get_schema_object())
         }
 
-        return wrapped_func
+        innermost_func = _get_wrapped_function(wrapped_func)
+        self.outermost_decorators[innermost_func] = self
+
+        @wraps(wrapped_func)
+        def wrapper(*args, **kwargs):
+            response = wrapped_func(*args, **kwargs)
+
+            if isinstance(response, Response):
+                return response
+            if not isinstance(response, self.response_class):
+                if self.outermost_decorators[innermost_func] == self:
+                    raise UnexpectedResponseError(type(response))
+
+                return response
+
+            try:
+                response.validate()
+            except DataError as e:
+                raise InvalidResponseError(e.errors) from e
+
+            response = jsonify(response.to_primitive())
+            response.status_code = self.code
+            return response
+
+        return wrapper
 
     def _get_schema_object(self):
         return schema_object_for_model(self.response_class)
