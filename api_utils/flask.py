@@ -28,10 +28,10 @@ class Swagger(Flasgger):
     def description(self, description: str):
         self.config["description"] = description
 
-    def autodoc(self, *, ignored_args: Sequence[str] =()):
+    def autodoc(self, *, ignored_args: Sequence[str] = ()):
         return AutodocDecorator(self, ignored_args=ignored_args)
 
-    def responds_with(self, response_class: Type[Model], *, code: int =200):
+    def responds_with(self, response_class: Type[Model], *, code: int = 200):
         return RespondsWithDecorator(self, response_class, code=code)
 
     def accepts(self, request_class: Type[Model]):
@@ -41,19 +41,12 @@ class Swagger(Flasgger):
         return TagsDecorator(tags)
 
     def add_definition(self, name: str, schema: dict) -> str:
-        definition_prefix = "#/definitions/"
-        i = 0
+        definition_name = "#/definitions/{}".format(name)
 
-        while True:
-            i += 1
-            definition_name = name
+        if name in self.config["definitions"]:
+            if self.config["definitions"][name] != schema:
+                raise ValueError("Conflicting definitions of `{}`".format(definition_name))
+        else:
+            self.config["definitions"][name] = schema
 
-            if i > 1:
-                definition_name += "_" + str(i)
-
-            if definition_name in self.config["definitions"].keys():
-                if self.config["definitions"][definition_name] == schema:
-                    return definition_prefix + definition_name
-            else:
-                self.config["definitions"][definition_name] = schema
-                return definition_prefix + definition_name
+        return definition_name
