@@ -35,7 +35,6 @@ def schema_object_for_fields(model: Type[Model]):
     # Loop over each field and either evict it or convert it
     for field_name, field_instance in model._fields.items():
         # Break 3-tuple out
-        print (field_name, field_instance)
         serialized_name = getattr(field_instance, 'serialized_name', None) or field_name
 
         if isinstance(field_instance, ModelType):

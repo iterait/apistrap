@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Type, Sequence
 
 from flasgger import Swagger as Flasgger
 from schematics import Model
@@ -13,34 +13,34 @@ class Swagger(Flasgger):
         super().__init__(app, config)
 
     @property
-    def title(self):
+    def title(self) -> str:
         return self.config.get("title")
 
     @title.setter
-    def title(self, title):
+    def title(self, title: str):
         self.config["title"] = title
 
     @property
-    def description(self):
+    def description(self) -> str:
         return self.config.get("description")
 
     @description.setter
-    def description(self, description):
+    def description(self, description: str):
         self.config["description"] = description
 
-    def autodoc(self, *, ignored_args=()):
+    def autodoc(self, *, ignored_args: Sequence[str] =()):
         return AutodocDecorator(self, ignored_args=ignored_args)
 
-    def responds_with(self, response_class: Type[Model], *, code=200):
+    def responds_with(self, response_class: Type[Model], *, code: int =200):
         return RespondsWithDecorator(self, response_class, code=code)
 
     def accepts(self, request_class: Type[Model]):
         return AcceptsDecorator(self, request_class)
 
-    def tags(self, *tags):
+    def tags(self, *tags: str):
         return TagsDecorator(tags)
 
-    def add_definition(self, name, schema):
+    def add_definition(self, name: str, schema: dict) -> str:
         definition_prefix = "#/definitions/"
         i = 0
 

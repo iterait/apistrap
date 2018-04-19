@@ -105,6 +105,7 @@ from api_utils import Swagger
 
 app = Flask(__name__)
 swagger = Swagger(app)
+
 @app.route("/")
 @swagger.autodoc()
 @swagger.tags("Tag 1", "Tag 2")

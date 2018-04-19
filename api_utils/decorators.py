@@ -1,6 +1,6 @@
-from functools import wraps, WRAPPER_ASSIGNMENTS
-from inspect import signature
-from typing import Type, Sequence
+import inspect
+from functools import wraps
+from typing import Type, Sequence, Callable
 
 from flask import request, jsonify, Response
 from schematics import Model
@@ -11,7 +11,7 @@ from api_utils.errors import ApiClientError, InvalidFieldsError, InvalidResponse
 from api_utils.schematics_utils import schema_object_for_model
 
 
-def _ensure_specs_dict(func):
+def _ensure_specs_dict(func: Callable):
     if not hasattr(func, "specs_dict"):
         func.specs_dict = {
             "parameters": [],
@@ -19,14 +19,14 @@ def _ensure_specs_dict(func):
         }
 
 
-def _add_ignored_param(func, arg: str):
+def _add_ignored_param(func: Callable, arg: str):
     if not hasattr(func, "_ignored_params"):
         setattr(func, "_ignored_params", [])
 
     func._ignored_params.append(arg)
 
 
-def _get_wrapped_function(func):
+def _get_wrapped_function(func: Callable):
     """
     Get the actual function from a decorated function. This could end up in a loop on horribly mangled functions.
     """
@@ -45,29 +45,29 @@ class AutodocDecorator:
     The metadata is collected by Flasgger and used to generate API specs/docs.
     """
 
-    type_map = {
+    TYPE_MAP = {
         int: "integer",
         str: "string"
     }
 
-    def __init__(self, swagger: 'api_utils.flask.Swagger', *, ignored_args=()):
-        self.ignored_args = ignored_args
+    def __init__(self, swagger: 'api_utils.flask.Swagger', *, ignored_args: Sequence[str] = ()):
+        self._ignored_args = ignored_args
 
-    def __call__(self, wrapped_func):
+    def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
-        sig = signature(wrapped_func)
-        ignored = list(self.ignored_args)
+        signature = inspect.signature(wrapped_func)
+        ignored = list(self._ignored_args)
         ignored += getattr(wrapped_func, "_ignored_params", [])
 
-        for arg in sig.parameters.values():
+        for arg in signature.parameters.values():
             if arg.name not in ignored:
                 param_data = {
                     "in": "path",
                     "name": arg.name
                 }
 
-                if arg.annotation in self.type_map:
-                    param_data["type"] = self.type_map[arg.annotation]
+                if arg.annotation in AutodocDecorator.TYPE_MAP:
+                    param_data["type"] = AutodocDecorator.TYPE_MAP[arg.annotation]
 
                 wrapped_func.specs_dict["parameters"].append(param_data)
 
@@ -86,16 +86,16 @@ class RespondsWithDecorator:
     when we get to the last decorator
     """
 
-    def __init__(self, swagger: 'api_utils.flask.Swagger', response_class: Type[Model], *, code=200):
-        self.response_class = response_class
-        self.code = code
-        self.swagger = swagger
+    def __init__(self, swagger: 'api_utils.flask.Swagger', response_class: Type[Model], *, code: int =200):
+        self._response_class = response_class
+        self._code = code
+        self._swagger = swagger
 
-    def __call__(self, wrapped_func):
+    def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
 
-        wrapped_func.specs_dict["responses"][str(self.code)] = {
-            "$ref": self.swagger.add_definition(self.response_class.__name__, self._get_schema_object())
+        wrapped_func.specs_dict["responses"][str(self._code)] = {
+            "$ref": self._swagger.add_definition(self._response_class.__name__, self._get_schema_object())
         }
 
         innermost_func = _get_wrapped_function(wrapped_func)
@@ -107,10 +107,9 @@ class RespondsWithDecorator:
 
             if isinstance(response, Response):
                 return response
-            if not isinstance(response, self.response_class):
+            if not isinstance(response, self._response_class):
                 if self.outermost_decorators[innermost_func] == self:
                     raise UnexpectedResponseError(type(response))
-
                 return response
 
             try:
@@ -119,13 +118,13 @@ class RespondsWithDecorator:
                 raise InvalidResponseError(e.errors) from e
 
             response = jsonify(response.to_primitive())
-            response.status_code = self.code
+            response.status_code = self._code
             return response
 
         return wrapper
 
     def _get_schema_object(self):
-        return schema_object_for_model(self.response_class)
+        return schema_object_for_model(self._response_class)
 
 
 class AcceptsDecorator:
@@ -135,10 +134,10 @@ class AcceptsDecorator:
     """
 
     def __init__(self, swagger: 'api_utils.flask.Swagger', request_class: Type[Model]):
-        self.swagger = swagger
-        self.request_class = request_class
+        self._swagger = swagger
+        self._request_class = request_class
 
-    def __call__(self, wrapped_func):
+    def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
 
         wrapped_func.specs_dict["parameters"].append({
@@ -146,24 +145,24 @@ class AcceptsDecorator:
             "name": "body",
             "required": True,
             "schema": {
-                "$ref": self.swagger.add_definition(self.request_class.__name__, schema_object_for_model(self.request_class))
+                "$ref": self._swagger.add_definition(self._request_class.__name__, schema_object_for_model(self._request_class))
             }
         })
 
-        sig = signature(wrapped_func)
-        request_arg = next(filter(lambda arg: issubclass(self.request_class, arg.annotation), sig.parameters.values()), None)
+        signature = inspect.signature(wrapped_func)
+        request_arg = next(filter(lambda arg: issubclass(self._request_class, arg.annotation), signature.parameters.values()), None)
 
         if request_arg is None:
-            raise TypeError("no argument of type {} found".format(self.request_class))
+            raise TypeError("no argument of type {} found".format(self._request_class))
 
         @wraps(wrapped_func)
         def wrapper(*args, **kwargs):
             if request.content_type != "application/json":
-                raise ApiClientError("Unsupported media type")
+                raise ApiClientError("Unsupported media type, JSON is expected")
 
-            bound_args = sig.bind_partial(*args, **kwargs)
+            bound_args = signature.bind_partial(*args, **kwargs)
             if request_arg.name not in bound_args.arguments:
-                request_object = self.request_class.__new__(self.request_class)
+                request_object = self._request_class.__new__(self._request_class)
 
                 try:
                     request_object.__init__(request.json, validate=True, partial=False, strict=True)
@@ -186,10 +185,10 @@ class TagsDecorator:
     """
 
     def __init__(self, tags: Sequence[str]):
-        self.tags = tags
+        self._tags = tags
 
-    def __call__(self, wrapped_func):
+    def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
         wrapped_func.specs_dict.setdefault("tags", [])
-        wrapped_func.specs_dict["tags"].extend(self.tags)
+        wrapped_func.specs_dict["tags"].extend(self._tags)
         return wrapped_func
