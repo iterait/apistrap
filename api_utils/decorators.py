@@ -8,7 +8,7 @@ from schematics.exceptions import DataError
 
 import api_utils.flask
 from api_utils.errors import ApiClientError, InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
-from api_utils.schematics_utils import schema_object_for_model
+from api_utils.schematics_converters import schematics_model_to_schema_object
 
 
 def _ensure_specs_dict(func: Callable):
@@ -124,7 +124,7 @@ class RespondsWithDecorator:
         return wrapper
 
     def _get_schema_object(self):
-        return schema_object_for_model(self._response_class)
+        return schematics_model_to_schema_object(self._response_class)
 
 
 class AcceptsDecorator:
@@ -145,7 +145,7 @@ class AcceptsDecorator:
             "name": "body",
             "required": True,
             "schema": {
-                "$ref": self._swagger.add_definition(self._request_class.__name__, schema_object_for_model(self._request_class))
+                "$ref": self._swagger.add_definition(self._request_class.__name__, schematics_model_to_schema_object(self._request_class))
             }
         })
 
