@@ -116,3 +116,16 @@ def test_correct_parameters(app_with_arg, client: Client):
     assert len(path["parameters"]) == 2
     assert next(filter(lambda item: item["in"] == "body", path["parameters"]), None) is not None
     assert next(filter(lambda item: item["in"] == "path", path["parameters"]), None) is not None
+
+
+def test_no_injection_parameter(app, swagger):
+    """
+    If the `accepts` decorator is applied to a function that has no parameter with a type annotation corresponding to
+    the request type, an exception should be thrown.
+    """
+
+    def view():
+        return jsonify()
+
+    with pytest.raises(TypeError):
+        swagger.accepts(Request)(view)
