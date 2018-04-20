@@ -87,8 +87,8 @@ def view():
 ```
 
 In this example, the response format is inferred from the model and added to the specification. Also, the return values
-from the view function are automatically validated and serialized to JSON. If an undeclared response type is returned,
-an error (code 500) is returned.
+from the view function are automatically validated and serialized to JSON. If an undeclared response type or an invalid 
+response object is encountered, an error (code 500) is returned.
 
 ### Working with the Specification File
 
