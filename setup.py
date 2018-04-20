@@ -1,4 +1,3 @@
-from pip.req import parse_requirements
 from setuptools import setup, find_packages
 
 setup(name='api-utils',
@@ -23,5 +22,5 @@ setup(name='api-utils',
       zip_safe=False,
       setup_requires=['pytest-runner'],
       tests_require=['pytest'],
-      install_requires=[str(ir.req) for ir in parse_requirements('requirements.txt', session='hack')],
+      install_requires=['flasgger', 'flask', 'schematics'],
       )
