@@ -1,7 +1,13 @@
 from typing import List, Dict
 
 
-class ApiClientError(BaseException):
+class SwaggerExtensionError(Exception):
+    """
+    Raised on incorrect usage of the Swagger extension
+    """
+
+
+class ApiClientError(Exception):
     pass
 
 
@@ -11,7 +17,7 @@ class InvalidFieldsError(ApiClientError):
         self.errors = errors
 
 
-class ApiServerError(BaseException):
+class ApiServerError(Exception):
     pass
 
 

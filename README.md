@@ -93,9 +93,13 @@ response object is encountered, an error (code 500) is returned.
 ### Working with the Specification File
 
 You can obtain the OpenAPI specification through `http://yourapi.tld/apispec_1.json`. This file can be used by 
-Swagger-related utilities.
+Swagger-related utilities. The specification file can be put under a different URL with 
+`swagger.spec_url = 'anything.json'`. By setting `swagger.spec_url` to `None`, you can effectively hide the 
+specification.
 
-The extension also serves the Swagger UI automatically. You can browse it on `http://yourapi.tld/apidocs`.
+The extension also serves the Swagger UI automatically. You can browse it on `http://yourapi.tld/apidocs/`. You can 
+change the URL of the UI with `swagger.ui_url = "/docs_url/`. This feature can be turned off completely with 
+`swagger.ui_url = None`.
 
 ### Organizing Endpoints Using Tags
 
