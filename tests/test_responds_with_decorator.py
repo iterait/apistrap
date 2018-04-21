@@ -53,7 +53,7 @@ def app_with_responds_with(app, swagger):
 
 
 def test_responses_in_swagger_json(app_with_responds_with, client):
-    response = client.get("/apispec_1.json")
+    response = client.get("/swagger.json")
 
     assert "definitions" in response.json
 

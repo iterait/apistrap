@@ -30,7 +30,7 @@ def app_with_accepts(app, swagger):
 
 
 def test_parameters_in_swagger_json(app_with_accepts, client):
-    response = client.get("/apispec_1.json")
+    response = client.get("/swagger.json")
 
     assert "definitions" in response.json
 
@@ -111,7 +111,7 @@ def app_with_arg(app, swagger):
 
 
 def test_correct_parameters(app_with_arg, client: Client):
-    response = client.get("/apispec_1.json")
+    response = client.get("/swagger.json")
     path = response.json["paths"]["/{arg}"]["post"]
     assert len(path["parameters"]) == 2
     assert next(filter(lambda item: item["in"] == "body", path["parameters"]), None) is not None

@@ -21,17 +21,17 @@ def test_ui_accessible(app_basic, client):
 
 
 def test_swagger_json_accessible(app_basic, client):
-    response = client.get("/apispec_1.json")
+    response = client.get("/swagger.json")
     assert response.status_code == 200
 
 
 def test_endpoint_present_in_swagger_json(app_basic, client):
-    response = client.get("/apispec_1.json")
+    response = client.get("/swagger.json")
     assert "/" in response.json["paths"].keys()
 
 
 def test_path_params_present_in_swagger_json(app_basic, client):
-    response = client.get("/apispec_1.json")
+    response = client.get("/swagger.json")
     path = "/view/{param}/{typed_param}"
 
     assert path in response.json["paths"].keys()

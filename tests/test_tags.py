@@ -12,7 +12,7 @@ def app_with_tags(app, swagger):
 
 
 def test_simple_tags(app_with_tags, client):
-    response = client.get("/apispec_1.json")
+    response = client.get("/swagger.json")
     path = response.json["paths"]["/"]["get"]
 
     assert "tags" in path
@@ -30,7 +30,7 @@ def app_with_repeated_tags(app, swagger):
 
 
 def test_repeated_tags(app_with_repeated_tags, client):
-    response = client.get("/apispec_1.json")
+    response = client.get("/swagger.json")
     path = response.json["paths"]["/"]["get"]
 
     assert "tags" in path

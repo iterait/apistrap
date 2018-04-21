@@ -78,7 +78,7 @@ def test_disable_spec_url(app, client):
     def view():
         return jsonify()
 
-    response = client.get("/apispec_1.json")
+    response = client.get("/swagger.json")
     assert response.status_code == 404
 
 

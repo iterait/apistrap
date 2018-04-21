@@ -11,11 +11,12 @@ from api_utils.schemas import ErrorResponse
 
 
 class Swagger(Flasgger):
-    def __init__(self, app=None, config=None):
-        config = config or deepcopy(self.DEFAULT_CONFIG)
-        config.setdefault("definitions", {})
+    def __init__(self, app=None):
+        self.config = deepcopy(self.DEFAULT_CONFIG)
+        self.config.setdefault("definitions", {})
+        self.spec_url = "/swagger.json"
         self._default_error_handlers = True
-        super().__init__(app, config)
+        super().__init__(app, self.config)
 
     def init_app(self, app: Flask, decorators=None):
         if self.use_default_error_handlers:
