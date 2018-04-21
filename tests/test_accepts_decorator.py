@@ -66,7 +66,7 @@ def test_request_parsing(app_with_accepts, client: Client):
     assert response.status_code == 200
 
 
-def test_unsupported_content_type(app_with_accepts, client: Client):
+def test_unsupported_content_type(app_with_accepts, client: Client, propagate_exceptions):
     with pytest.raises(ApiClientError):
         client.post("/", data=json.dumps({
             "string_field": "foo",
@@ -75,14 +75,14 @@ def test_unsupported_content_type(app_with_accepts, client: Client):
 
 
 @pytest.mark.parametrize("field", ["string_field", "int_field"])
-def test_missing_field(app_with_accepts, client: Client, field):
+def test_missing_field(app_with_accepts, client: Client, field, propagate_exceptions):
     with pytest.raises(InvalidFieldsError):
         req_data = {"string_field": "foo", "int_field": 42}
         del req_data[field]
         client.post("/", content_type="application/json", data=json.dumps(req_data))
 
 
-def test_unexpected_field(app_with_accepts, client: Client):
+def test_unexpected_field(app_with_accepts, client: Client, propagate_exceptions):
     with pytest.raises(InvalidFieldsError):
         client.post("/", content_type="application/json", data=json.dumps({
             "string_field": "foo",
@@ -91,7 +91,7 @@ def test_unexpected_field(app_with_accepts, client: Client):
         }))
 
 
-def test_invalid_field(app_with_accepts, client: Client):
+def test_invalid_field(app_with_accepts, client: Client, propagate_exceptions):
     with pytest.raises(InvalidFieldsError):
         client.post("/", content_type="application/json", data=json.dumps({
             "string_field": "foo",

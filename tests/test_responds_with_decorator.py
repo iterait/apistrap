@@ -103,11 +103,11 @@ def test_error_response(app_with_responds_with, client):
     assert response.json["error_message"] == "Error"
 
 
-def test_weird_response(app_with_responds_with, client):
+def test_weird_response(app_with_responds_with, client, propagate_exceptions):
     with pytest.raises(UnexpectedResponseError):
         client.get("/weird")
 
 
-def test_invalid_response(app_with_responds_with, client):
+def test_invalid_response(app_with_responds_with, client, propagate_exceptions):
     with pytest.raises(InvalidResponseError):
         client.get("/invalid")

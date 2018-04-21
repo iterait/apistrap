@@ -1,5 +1,6 @@
 import pytest
 from flask import Flask
+from pytest_mock import MockFixture
 
 from api_utils.flask import Swagger
 
@@ -19,3 +20,18 @@ def app():
 @pytest.fixture(scope='function')
 def swagger(app):
     yield Swagger(app)
+
+
+@pytest.fixture(scope='function')
+def propagate_exceptions(app, mocker: MockFixture):
+    def reraise(e):
+        raise e
+
+    handle = mocker.patch.object(app, "handle_user_exception", autospec=True)
+    handle.side_effect = reraise
+
+
+@pytest.fixture(scope='function')
+def app_in_production(app):
+    app.debug = False
+    app.testing = False

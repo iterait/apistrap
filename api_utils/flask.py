@@ -2,17 +2,39 @@ from typing import Type, Sequence, Optional
 from copy import deepcopy
 
 from flasgger import Swagger as Flasgger
+from flask import Flask, jsonify
 from schematics import Model
 
 from api_utils.decorators import AutodocDecorator, RespondsWithDecorator, AcceptsDecorator, TagsDecorator
-from api_utils.errors import SwaggerExtensionError
+from api_utils.errors import SwaggerExtensionError, ApiClientError, ApiServerError
+from api_utils.schemas import ErrorResponse
 
 
 class Swagger(Flasgger):
     def __init__(self, app=None, config=None):
         config = config or deepcopy(self.DEFAULT_CONFIG)
         config.setdefault("definitions", {})
+        self._default_error_handlers = True
         super().__init__(app, config)
+
+    def init_app(self, app: Flask, decorators=None):
+        if self.use_default_error_handlers:
+            app.register_error_handler(ApiClientError, self.error_handler)
+            app.register_error_handler(ApiServerError, self.internal_error_handler)
+            app.register_error_handler(Exception, self.internal_error_handler)
+
+        super().init_app(app, decorators)
+
+    def error_handler(self, exception):
+        return jsonify(ErrorResponse(dict(message=str(exception))).to_primitive()), 400
+
+    def internal_error_handler(self, exception):
+        if self.app.debug:
+            message = str(exception)
+        else:
+            message = "Internal server error"
+
+        return jsonify(ErrorResponse(dict(message=message)).to_primitive()), 500
 
     @property
     def title(self) -> str:
@@ -66,6 +88,15 @@ class Swagger(Flasgger):
 
         self.config["swagger_ui"] = True
         self.config["specs_route"] = value
+
+    @property
+    def use_default_error_handlers(self) -> bool:
+        return self._default_error_handlers
+
+    @use_default_error_handlers.setter
+    def use_default_error_handlers(self, value: bool):
+        self._ensure_no_app("You cannot change the error handler settings after binding the extension with Flask")
+        self._default_error_handlers = value
 
     def autodoc(self, *, ignored_args: Sequence[str] = ()):
         return AutodocDecorator(self, ignored_args=ignored_args)
