@@ -28,7 +28,8 @@ you can omit the `app` argument and call `Swagger.init_app(app)` later when you 
 
 **Important**: A big part of the functionality is exposed using decorators on Flask view functions. Make sure that the 
 Flask `route()` decorator is always the last applied one (the one on the top). Otherwise, the HTTP handler might not 
-call some of our functions.
+call some of our functions. Also, the `swagger.autodoc()` decorator has to be applied after all the other Swagger 
+decorators.
 
 ### Request Body Parsing
 
