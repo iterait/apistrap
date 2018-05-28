@@ -4,6 +4,7 @@ from copy import deepcopy
 from flasgger import Swagger as Flasgger
 from flask import Flask, jsonify, Response
 from schematics import Model
+from werkzeug.exceptions import HTTPException
 
 from api_utils.decorators import AutodocDecorator, RespondsWithDecorator, AcceptsDecorator, TagsDecorator
 from api_utils.errors import SwaggerExtensionError, ApiClientError, ApiServerError
@@ -29,11 +30,21 @@ class Swagger(Flasgger):
         :param decorators: decorators that should be used to wrap the UI and specification views
         """
         if self.use_default_error_handlers:
+            app.register_error_handler(HTTPException, self.http_error_handler)
             app.register_error_handler(ApiClientError, self.error_handler)
             app.register_error_handler(ApiServerError, self.internal_error_handler)
             app.register_error_handler(Exception, self.internal_error_handler)
 
         super().init_app(app, decorators)
+
+    def http_error_handler(self, exception: HTTPException):
+        """
+        A handler for Flask HTTPException objects
+        :param exception: the exception raised due to a client error
+        :return: a response object
+        """
+
+        return jsonify(ErrorResponse(dict(message=exception.description)).to_primitive()), exception.code
 
     def error_handler(self, exception):
         """
