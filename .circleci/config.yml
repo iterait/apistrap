@@ -1,0 +1,57 @@
+version: 2
+
+references:
+
+  install: &install
+    run:
+      name: Install dependencies and apistrap on Archlinux
+      command: |
+        set -x
+        pip install -e .
+
+  test: &test
+    run:
+      name: Run tests.
+      command: |
+        python setup.py test
+
+  deploy: &deploy
+    run:
+      name: PyPI deploy
+      command: |
+        pip3 install wheel setuptools --upgrade
+        bash <(curl -fsSL https://raw.githubusercontent.com/Cognexa/ci-utils/master/pypi_deploy.sh)
+
+jobs:
+
+  test_archlinux:
+    docker:
+      - image: cognexa/archlinux:latest
+    working_directory: ~/apistrap
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 17.11.0-ce
+      - checkout
+      - *install
+      - *test
+
+  deploy:
+     docker:
+       - image: pritunl/archlinux:2018-01-13
+     working_directory: ~/apistrap
+     steps:
+       - checkout
+       - *deploy
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test_archlinux
+      - deploy:
+          filters:
+            branches:
+              only: master
+          requires:
+            - test_archlinux
