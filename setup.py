@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
-setup(name='api-utils',
+setup(name='apistrap',
       version='0.1.0',
-      description='API utils',
+      description='Cognexa REST API utilities',
       classifiers=[
           'Development Status :: 4 - Beta',
           'Environment :: Console',
@@ -13,7 +13,7 @@ setup(name='api-utils',
           'Programming Language :: Python :: 3.6'
       ],
       keywords='api rest http',
-      url='https://github.com/cognexa/api-utils',
+      url='https://github.com/cognexa/apistrap',
       author='Cognexa Solutions s.r.o.',
       author_email='info@cognexa.com',
       license='MIT',
@@ -21,6 +21,6 @@ setup(name='api-utils',
       include_package_data=True,
       zip_safe=False,
       setup_requires=['pytest-runner'],
-      tests_require=['pytest'],
+      tests_require=['pytest', 'pytest-mock', 'pytest-flask'],
       install_requires=['flasgger', 'flask', 'schematics'],
       )
