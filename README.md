@@ -17,7 +17,7 @@ First, you need to initialize the extension and bind it to your Flask app.
 
 ```python
 from flask import Flask
-from api_utils import Swagger
+from apistrap import Swagger
 app = Flask(__name__)
 swagger = Swagger(app)
 swagger.title = "Some title for your API"
@@ -38,7 +38,7 @@ decorators.
 from schematics import Model
 from schematics.types import StringType
 from flask import Flask, jsonify
-from api_utils import Swagger
+from apistrap import Swagger
 
 app = Flask(__name__)
 swagger = Swagger(app)
@@ -69,7 +69,7 @@ Note that the doc block will be parsed and used in the API specification as a de
 from schematics import Model
 from schematics.types import StringType
 from flask import Flask
-from api_utils import Swagger
+from apistrap import Swagger
 
 app = Flask(__name__)
 swagger = Swagger(app)
@@ -107,7 +107,7 @@ change the URL of the UI with `swagger.ui_url = "/docs_url/`. This feature can b
 
 ```python
 from flask import Flask, jsonify
-from api_utils import Swagger
+from apistrap import Swagger
 
 app = Flask(__name__)
 swagger = Swagger(app)

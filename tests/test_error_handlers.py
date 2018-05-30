@@ -1,7 +1,7 @@
 import pytest
 
-from api_utils import Swagger
-from api_utils.errors import ApiClientError, ApiServerError
+from apistrap import Swagger
+from apistrap.errors import ApiClientError, ApiServerError
 
 
 @pytest.fixture()
