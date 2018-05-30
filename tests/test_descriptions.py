@@ -1,5 +1,5 @@
 import pytest
-from api_utils.flask import Swagger
+from apistrap.flask import Swagger
 
 
 def test_title_in_swagger_json(app, client):

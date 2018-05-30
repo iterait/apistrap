@@ -6,9 +6,9 @@ from flask import Flask, jsonify, Response
 from schematics import Model
 from werkzeug.exceptions import HTTPException
 
-from api_utils.decorators import AutodocDecorator, RespondsWithDecorator, AcceptsDecorator, TagsDecorator
-from api_utils.errors import SwaggerExtensionError, ApiClientError, ApiServerError
-from api_utils.schemas import ErrorResponse
+from apistrap.decorators import AutodocDecorator, RespondsWithDecorator, AcceptsDecorator, TagsDecorator
+from apistrap.errors import SwaggerExtensionError, ApiClientError, ApiServerError
+from apistrap.schemas import ErrorResponse
 
 
 class Swagger(Flasgger):

@@ -2,7 +2,7 @@ import pytest
 from flask import Flask
 from pytest_mock import MockFixture
 
-from api_utils.flask import Swagger
+from apistrap.flask import Swagger
 
 
 @pytest.fixture(scope='function')

@@ -6,7 +6,7 @@ from schematics import Model
 from schematics.types import StringType, IntType
 from werkzeug.test import Client
 
-from api_utils.errors import ApiClientError, InvalidFieldsError
+from apistrap.errors import ApiClientError, InvalidFieldsError
 
 
 def extract_definition_name(definition_spec: str):

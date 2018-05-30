@@ -1,6 +1,6 @@
 from schematics import Model
 from schematics.types import NumberType, IntType, LongType, FloatType, StringType, ModelType, ListType, DictType
-from api_utils.schematics_converters import schematics_model_to_schema_object
+from apistrap.schematics_converters import schematics_model_to_schema_object
 
 
 class ExampleModel(Model):

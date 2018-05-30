@@ -6,9 +6,9 @@ from flask import request, jsonify, Response
 from schematics import Model
 from schematics.exceptions import DataError
 
-import api_utils.flask
-from api_utils.errors import ApiClientError, InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
-from api_utils.schematics_converters import schematics_model_to_schema_object
+import apistrap.flask
+from apistrap.errors import ApiClientError, InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
+from apistrap.schematics_converters import schematics_model_to_schema_object
 
 
 def _ensure_specs_dict(func: Callable):
@@ -50,7 +50,7 @@ class AutodocDecorator:
         str: "string"
     }
 
-    def __init__(self, swagger: 'api_utils.flask.Swagger', *, ignored_args: Sequence[str] = ()):
+    def __init__(self, swagger: 'apistrap.flask.Swagger', *, ignored_args: Sequence[str] = ()):
         self._ignored_args = ignored_args
 
     def __call__(self, wrapped_func: Callable):
@@ -86,7 +86,7 @@ class RespondsWithDecorator:
     when we get to the last decorator
     """
 
-    def __init__(self, swagger: 'api_utils.flask.Swagger', response_class: Type[Model], *, code: int =200):
+    def __init__(self, swagger: 'apistrap.flask.Swagger', response_class: Type[Model], *, code: int =200):
         self._response_class = response_class
         self._code = code
         self._swagger = swagger
@@ -133,7 +133,7 @@ class AcceptsDecorator:
     The destination argument must be annotated with the request type.
     """
 
-    def __init__(self, swagger: 'api_utils.flask.Swagger', request_class: Type[Model]):
+    def __init__(self, swagger: 'apistrap.flask.Swagger', request_class: Type[Model]):
         self._swagger = swagger
         self._request_class = request_class
 

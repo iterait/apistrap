@@ -2,7 +2,7 @@ import pytest
 from schematics import Model
 from schematics.types import StringType
 
-from api_utils.errors import UnexpectedResponseError, InvalidResponseError
+from apistrap.errors import UnexpectedResponseError, InvalidResponseError
 
 
 def extract_definition_name(definition_spec: str):
