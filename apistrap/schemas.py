@@ -1,5 +1,6 @@
 from schematics import Model
-from schematics.types import StringType
+from schematics.types import StringType, DictType, BaseType
+from typing import Mapping, Any
 
 
 class ErrorResponse(Model):
@@ -7,4 +8,5 @@ class ErrorResponse(Model):
     An error message wrapper
     """
 
-    message = StringType(required=True)
+    message: str = StringType(required=True)
+    debug_data: Mapping[str, Any] = DictType(BaseType, required=False)

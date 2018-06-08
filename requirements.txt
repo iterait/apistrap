@@ -1,3 +1,4 @@
-flask
+more_itertools
+flask>=1.0
 flasgger
 schematics

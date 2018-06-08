@@ -1,5 +1,5 @@
-from typing import Type, Sequence, Optional
 from copy import deepcopy
+from typing import Type, Sequence, Optional
 
 from flasgger import Swagger as Flasgger
 from flask import Flask, jsonify, Response
@@ -9,6 +9,7 @@ from werkzeug.exceptions import HTTPException
 from apistrap.decorators import AutodocDecorator, RespondsWithDecorator, AcceptsDecorator, TagsDecorator
 from apistrap.errors import SwaggerExtensionError, ApiClientError, ApiServerError
 from apistrap.schemas import ErrorResponse
+from apistrap.utils import format_exception
 
 
 class Swagger(Flasgger):
@@ -52,7 +53,16 @@ class Swagger(Flasgger):
         :param exception: the exception raised due to a client error
         :return: a response object
         """
-        return jsonify(ErrorResponse(dict(message=str(exception))).to_primitive()), 400
+
+        if self.app.debug:
+            error_response = ErrorResponse(dict(
+                message=str(exception),
+                debug_data=format_exception(exception)
+            ))
+        else:
+            error_response = ErrorResponse(dict(message=str(exception)))
+
+        return jsonify(error_response.to_primitive()), 400
 
     def internal_error_handler(self, exception):
         """
@@ -60,12 +70,16 @@ class Swagger(Flasgger):
         :param exception: the exception raised due to a server error
         :return: a response object
         """
-        if self.app.debug:
-            message = str(exception)
-        else:
-            message = "Internal server error"
 
-        return jsonify(ErrorResponse(dict(message=message)).to_primitive()), 500
+        if self.app.debug:
+            error_response = ErrorResponse(dict(
+                message=str(exception),
+                debug_data=format_exception(exception)
+            ))
+        else:
+            error_response = ErrorResponse(dict(message="Internal server error"))
+
+        return jsonify(error_response.to_primitive()), 500
 
     @property
     def title(self) -> str:
