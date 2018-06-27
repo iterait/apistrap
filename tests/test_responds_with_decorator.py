@@ -30,6 +30,12 @@ def app_with_responds_with(app, swagger):
     def view():
         return OkResponse(dict(string_field="Hello World"))
 
+    @app.route("/description")
+    @swagger.autodoc()
+    @swagger.responds_with(OkResponse, description='my description')
+    def descriptive_view():
+        return OkResponse(dict(string_field="Hello descriptive World"))
+
     @app.route("/error")
     @swagger.autodoc()
     @swagger.responds_with(OkResponse)
@@ -57,9 +63,11 @@ def test_responses_in_swagger_json(app_with_responds_with, client):
 
     assert "definitions" in response.json
 
+    # test ok response
     assert "200" in response.json["paths"]["/"]["get"]["responses"]
-    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["200"]
-    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["200"]["$ref"])
+    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["200"]
+    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["200"]["schema"]
+    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["200"]["schema"]["$ref"])
 
     assert response.json["definitions"][ref] == {
         "title": "OkResponse",
@@ -72,9 +80,17 @@ def test_responses_in_swagger_json(app_with_responds_with, client):
         "required": ["string_field"]
     }
 
+    # test default and custom descriptions
+    assert "description" in response.json["paths"]["/"]["get"]["responses"]["200"]
+    assert "OkResponse" == response.json["paths"]["/"]["get"]["responses"]["200"]["description"]
+    assert "description" in response.json["paths"]["/description"]["get"]["responses"]["200"]
+    assert "my description" == response.json["paths"]["/description"]["get"]["responses"]["200"]["description"]
+
+    # test error response
     assert "400" in response.json["paths"]["/"]["get"]["responses"]
-    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["400"]
-    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["400"]["$ref"])
+    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["400"]
+    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["400"]["schema"]
+    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["400"]["schema"]["$ref"])
 
     assert response.json["definitions"][ref] == {
         "title": "ErrorResponse",

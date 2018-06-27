@@ -1,6 +1,6 @@
 import inspect
 from functools import wraps
-from typing import Type, Sequence, Callable
+from typing import Type, Sequence, Callable, Optional
 
 from flask import request, jsonify, Response
 from schematics import Model
@@ -86,16 +86,21 @@ class RespondsWithDecorator:
     when we get to the last decorator
     """
 
-    def __init__(self, swagger: 'apistrap.flask.Swagger', response_class: Type[Model], *, code: int =200):
+    def __init__(self, swagger: 'apistrap.flask.Swagger', response_class: Type[Model], *,
+                 code: int=200, description: Optional[str]=None):
         self._response_class = response_class
         self._code = code
         self._swagger = swagger
+        self._description = description or self._response_class.__name__
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
 
         wrapped_func.specs_dict["responses"][str(self._code)] = {
-            "$ref": self._swagger.add_definition(self._response_class.__name__, self._get_schema_object())
+            "schema": {
+                "$ref": self._swagger.add_definition(self._response_class.__name__, self._get_schema_object())
+            },
+            "description": self._description
         }
 
         innermost_func = _get_wrapped_function(wrapped_func)

@@ -165,12 +165,12 @@ class Swagger(Flasgger):
         """
         return AutodocDecorator(self, ignored_args=ignored_args)
 
-    def responds_with(self, response_class: Type[Model], *, code: int = 200):
+    def responds_with(self, response_class: Type[Model], *, code: int=200, description: Optional[str]=None):
         """
         A decorator that fills in response schemas in the Swagger specification. It also converts Schematics models
         returned by view functions to JSON and validates them.
         """
-        return RespondsWithDecorator(self, response_class, code=code)
+        return RespondsWithDecorator(self, response_class, code=code, description=description)
 
     def accepts(self, request_class: Type[Model]):
         """
