@@ -22,5 +22,5 @@ setup(name='apistrap',
       zip_safe=False,
       setup_requires=['pytest-runner'],
       tests_require=['pytest', 'pytest-mock', 'pytest-flask'],
-      install_requires=['flasgger', 'flask', 'schematics'],
+      install_requires=['flasgger', 'flask', 'schematics', 'more_itertools'],
       )
