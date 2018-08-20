@@ -71,7 +71,17 @@ class AutodocDecorator:
 
                 wrapped_func.specs_dict["parameters"].append(param_data)
 
+        wrapped_func.specs_dict["operationId"] = self._snake_to_camel(wrapped_func.__name__)
+
         return wrapped_func
+
+    @staticmethod
+    def _snake_to_camel(value):
+        """
+        Convert a string from snake_case to camelCase
+        """
+        result = ''.join(x.capitalize() or '_' for x in value.split('_'))
+        return result[0].lower() + result[1:]
 
 
 class RespondsWithDecorator:
