@@ -35,13 +35,19 @@ def test_path_params_present_in_swagger_json(app_basic, client):
     path = "/view/{param}/{typed_param}"
 
     assert path in response.json["paths"].keys()
-    assert response.json["paths"][path]["get"] == {
-        "parameters": [{
+    assert response.json["paths"][path]["get"]["parameters"] == [
+        {
             "in": "path",
             "name": "param"
         }, {
             "in": "path",
             "name": "typed_param",
             "type": "integer"
-        }]
-    }
+        }
+    ]
+
+def test_operation_id_present_in_swagger_json(app_basic, client):
+    response = client.get("/swagger.json")
+    path = "/view/{param}/{typed_param}"
+    assert path in response.json["paths"].keys()
+    assert response.json["paths"][path]["get"]["operationId"] == "viewWithParams"
