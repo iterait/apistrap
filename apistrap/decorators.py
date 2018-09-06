@@ -138,7 +138,7 @@ class RespondsWithDecorator:
                 return response
             if isinstance(response, FileResponse):
                 return send_file(filename_or_fp=response.filename_or_fp,
-                                 mimetype=response.mimetype,
+                                 mimetype=self._mimetype,
                                  as_attachment=response.as_attachment,
                                  attachment_filename=response.attachment_filename,
                                  add_etags=response.add_etags,

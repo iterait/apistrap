@@ -6,6 +6,7 @@ from schematics.types import StringType
 from apistrap.errors import UnexpectedResponseError, InvalidResponseError
 from apistrap.types import FileResponse
 
+
 def extract_definition_name(definition_spec: str):
     return definition_spec.split("/")[-1]
 

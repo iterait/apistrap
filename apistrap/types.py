@@ -9,7 +9,6 @@ from schematics.types import CompoundType, StringType, BooleanType
 @dataclass
 class FileResponse:
     filename_or_fp: Union[str, bytes]
-    mimetype: str=None
     as_attachment: bool=False
     attachment_filename: str=None
     add_etags: bool=True
