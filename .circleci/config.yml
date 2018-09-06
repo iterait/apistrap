@@ -38,7 +38,7 @@ jobs:
 
   deploy:
      docker:
-       - image: pritunl/archlinux:2018-01-13
+       - image: cognexa/archlinux
      working_directory: ~/apistrap
      steps:
        - checkout

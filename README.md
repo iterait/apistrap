@@ -1,6 +1,6 @@
-# Cognexa HTTP API utilities
+# Apistrap - HTTP API utilities
 
-[![CircleCI](https://circleci.com/gh/Cognexa/apistrap/tree/dev.svg?style=shield&circle-token=74491da8e8fa3528ab1566beffd13d3386acefa0)](https://circleci.com/gh/Cognexa/apistrap/tree/master)
+[![CircleCI](https://circleci.com/gh/iterait/apistrap.png?circle-token=6e0633d5636dd5b858dd4db501695e10b16f373f)](https://circleci.com/gh/iterait/apistrap/tree/master)
 [![Development Status](https://img.shields.io/badge/status-CX%20Regular-brightgreen.svg?style=flat)]()
 [![Master Developer](https://img.shields.io/badge/master-Jan%20Buchar-lightgrey.svg?style=flat)]()
 
