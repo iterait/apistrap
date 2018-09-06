@@ -1,7 +1,21 @@
-from typing import List, Sequence, Iterable
+from dataclasses import dataclass
+from datetime import datetime
+from typing import List, Sequence, Iterable, Union
 
 from schematics.exceptions import BaseError, CompoundError, ConversionError
-from schematics.types import CompoundType
+from schematics.types import CompoundType, StringType, BooleanType
+
+
+@dataclass
+class FileResponse:
+    filename_or_fp: Union[str, bytes]
+    mimetype: str=None
+    as_attachment: bool=False
+    attachment_filename: str=None
+    add_etags: bool=True
+    cache_timeout: int=None
+    conditional: bool=False
+    last_modified: Union[datetime, int]=None
 
 
 class TupleType(CompoundType):

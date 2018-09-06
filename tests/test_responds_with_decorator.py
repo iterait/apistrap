@@ -1,9 +1,10 @@
+import io
 import pytest
 from schematics import Model
 from schematics.types import StringType
 
 from apistrap.errors import UnexpectedResponseError, InvalidResponseError
-
+from apistrap.types import FileResponse
 
 def extract_definition_name(definition_spec: str):
     return definition_spec.split("/")[-1]
@@ -56,6 +57,15 @@ def app_with_responds_with(app, swagger):
     @swagger.responds_with(ErrorResponse, code=400)
     def invalid_view():
         return OkResponse(dict())
+
+    @app.route("/file")
+    @swagger.autodoc()
+    @swagger.responds_with(FileResponse)
+    def get_file():
+        message = 'hello'
+        return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
+                            as_attachment=True,
+                            attachment_filename='hello.txt')
 
 
 def test_responses_in_swagger_json(app_with_responds_with, client):
@@ -127,3 +137,9 @@ def test_weird_response(app_with_responds_with, client, propagate_exceptions):
 def test_invalid_response(app_with_responds_with, client, propagate_exceptions):
     with pytest.raises(InvalidResponseError):
         client.get("/invalid")
+
+
+def test_file_response(app_with_responds_with, client):
+    response = client.get("/file")
+    assert response.status_code == 200
+    assert response.data == b'hello'
