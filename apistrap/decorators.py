@@ -98,20 +98,23 @@ class RespondsWithDecorator:
     """
 
     def __init__(self, swagger: 'apistrap.flask.Swagger', response_class: Type[Model], *,
-                 code: int=200, description: Optional[str]=None):
+                 code: int=200, description: Optional[str]=None, mimetype: Optional[str]=None):
         self._response_class = response_class
         self._code = code
         self._swagger = swagger
         self._description = description or self._response_class.__name__
+        self._mimetype = mimetype
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
 
         if self._response_class == FileResponse:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
-                "schema": {},
-                "description": 'Downloadable file'
+                "schema": {'type': 'file'},
+                "description": self._description
             }
+            if self._mimetype is not None:
+                wrapped_func.specs_dict["produces"] = self._mimetype
         else:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
                 "schema": {
