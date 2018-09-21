@@ -5,6 +5,7 @@ from schematics.types import StringType
 
 from apistrap.errors import UnexpectedResponseError, InvalidResponseError
 from apistrap.types import FileResponse
+from apistrap.schemas import EmptyResponse
 
 
 def extract_definition_name(definition_spec: str):
@@ -67,6 +68,12 @@ def app_with_responds_with(app, swagger):
         return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
                             as_attachment=True,
                             attachment_filename='hello.txt')
+
+    @app.route("/empty")
+    @swagger.autodoc()
+    @swagger.responds_with(EmptyResponse)
+    def get_empty_response():
+        return EmptyResponse()
 
 
 def test_responses_in_swagger_json(app_with_responds_with, client):
@@ -144,3 +151,9 @@ def test_file_response(app_with_responds_with, client):
     response = client.get("/file")
     assert response.status_code == 200
     assert response.data == b'hello'
+
+
+def test_empty_response(app_with_responds_with, client):
+    response = client.get("/empty")
+    assert response.status_code == 200
+    assert response.json == {}
