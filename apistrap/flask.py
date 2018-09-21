@@ -1,4 +1,5 @@
 from copy import deepcopy
+import logging
 from typing import Type, Sequence, Optional
 
 from flasgger import Swagger as Flasgger
@@ -45,6 +46,7 @@ class Swagger(Flasgger):
         :return: a response object
         """
 
+        logging.exception(exception)
         return jsonify(ErrorResponse(dict(message=exception.description)).to_primitive()), exception.code
 
     def error_handler(self, exception):
@@ -55,6 +57,7 @@ class Swagger(Flasgger):
         """
 
         if self.app.debug:
+            logging.exception(exception)
             error_response = ErrorResponse(dict(
                 message=str(exception),
                 debug_data=format_exception(exception)
@@ -70,6 +73,8 @@ class Swagger(Flasgger):
         :param exception: the exception raised due to a server error
         :return: a response object
         """
+
+        logging.exception(exception)
 
         if self.app.debug:
             error_response = ErrorResponse(dict(
