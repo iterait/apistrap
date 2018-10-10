@@ -2,13 +2,14 @@ import inspect
 from functools import wraps
 from typing import Type, Sequence, Callable, Optional
 
-from flask import request, jsonify, Response
+from flask import request, jsonify, Response, send_file
 from schematics import Model
 from schematics.exceptions import DataError
 
 import apistrap.flask
 from apistrap.errors import ApiClientError, InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
 from apistrap.schematics_converters import schematics_model_to_schema_object
+from apistrap.types import FileResponse
 
 
 def _ensure_specs_dict(func: Callable):
@@ -97,21 +98,30 @@ class RespondsWithDecorator:
     """
 
     def __init__(self, swagger: 'apistrap.flask.Swagger', response_class: Type[Model], *,
-                 code: int=200, description: Optional[str]=None):
+                 code: int=200, description: Optional[str]=None, mimetype: Optional[str]=None):
         self._response_class = response_class
         self._code = code
         self._swagger = swagger
         self._description = description or self._response_class.__name__
+        self._mimetype = mimetype
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
 
-        wrapped_func.specs_dict["responses"][str(self._code)] = {
-            "schema": {
-                "$ref": self._swagger.add_definition(self._response_class.__name__, self._get_schema_object())
-            },
-            "description": self._description
-        }
+        if self._response_class == FileResponse:
+            wrapped_func.specs_dict["responses"][str(self._code)] = {
+                "schema": {'type': 'file'},
+                "description": self._description
+            }
+            if self._mimetype is not None:
+                wrapped_func.specs_dict["produces"] = self._mimetype
+        else:
+            wrapped_func.specs_dict["responses"][str(self._code)] = {
+                "schema": {
+                    "$ref": self._swagger.add_definition(self._response_class.__name__, self._get_schema_object())
+                },
+                "description": self._description
+            }
 
         innermost_func = _get_wrapped_function(wrapped_func)
         self.outermost_decorators[innermost_func] = self
@@ -126,6 +136,15 @@ class RespondsWithDecorator:
                 if self.outermost_decorators[innermost_func] == self:
                     raise UnexpectedResponseError(type(response))
                 return response
+            if isinstance(response, FileResponse):
+                return send_file(filename_or_fp=response.filename_or_fp,
+                                 mimetype=self._mimetype,
+                                 as_attachment=response.as_attachment,
+                                 attachment_filename=response.attachment_filename,
+                                 add_etags=response.add_etags,
+                                 cache_timeout=response.cache_timeout,
+                                 conditional=response.conditional,
+                                 last_modified=response.last_modified)
 
             try:
                 response.validate()

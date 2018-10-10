@@ -1,4 +1,5 @@
 from copy import deepcopy
+import logging
 from typing import Type, Sequence, Optional
 
 from flasgger import Swagger as Flasgger
@@ -45,6 +46,7 @@ class Swagger(Flasgger):
         :return: a response object
         """
 
+        logging.exception(exception)
         return jsonify(ErrorResponse(dict(message=exception.description)).to_primitive()), exception.code
 
     def error_handler(self, exception):
@@ -55,6 +57,7 @@ class Swagger(Flasgger):
         """
 
         if self.app.debug:
+            logging.exception(exception)
             error_response = ErrorResponse(dict(
                 message=str(exception),
                 debug_data=format_exception(exception)
@@ -70,6 +73,8 @@ class Swagger(Flasgger):
         :param exception: the exception raised due to a server error
         :return: a response object
         """
+
+        logging.exception(exception)
 
         if self.app.debug:
             error_response = ErrorResponse(dict(
@@ -165,12 +170,13 @@ class Swagger(Flasgger):
         """
         return AutodocDecorator(self, ignored_args=ignored_args)
 
-    def responds_with(self, response_class: Type[Model], *, code: int=200, description: Optional[str]=None):
+    def responds_with(self, response_class: Type[Model], *, code: int=200, description: Optional[str]=None,
+                      mimetype: Optional[str]=None):
         """
         A decorator that fills in response schemas in the Swagger specification. It also converts Schematics models
         returned by view functions to JSON and validates them.
         """
-        return RespondsWithDecorator(self, response_class, code=code, description=description)
+        return RespondsWithDecorator(self, response_class, code=code, description=description, mimetype=mimetype)
 
     def accepts(self, request_class: Type[Model]):
         """

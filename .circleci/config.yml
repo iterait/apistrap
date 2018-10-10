@@ -7,6 +7,7 @@ references:
       name: Install dependencies and apistrap on Archlinux
       command: |
         set -x
+        pip install coveralls coverage
         pip install -e .
 
   test: &test
@@ -20,13 +21,21 @@ references:
       name: PyPI deploy
       command: |
         pip3 install wheel setuptools --upgrade
-        bash <(curl -fsSL https://raw.githubusercontent.com/Cognexa/ci-utils/master/pypi_deploy.sh)
+        bash <(curl -fsSL https://raw.githubusercontent.com/iterait/ci-utils/master/pypi_deploy.sh)
+
+  coverage: &coverage
+    run:
+      name: Report test coverage
+      command: |
+        coverage run setup.py test
+        coverage report
+        COVERALLS_REPO_TOKEN=QEAuo5Pufwd8TGqQiqt7a1HWWp3i9mL0Y coveralls
 
 jobs:
 
   test_archlinux:
     docker:
-      - image: cognexa/archlinux:latest
+      - image: iterait/archlinux
     working_directory: ~/apistrap
     steps:
       - setup_remote_docker:
@@ -36,22 +45,48 @@ jobs:
       - *install
       - *test
 
+  coverage:
+    docker:
+      - image: iterait/archlinux
+    working_directory: ~/apistrap
+    steps:
+      - checkout
+      - *install
+      - *coverage
+
   deploy:
      docker:
-       - image: cognexa/archlinux
+       - image: iterait/archlinux
      working_directory: ~/apistrap
      steps:
        - checkout
+       - *install
        - *deploy
 
 workflows:
   version: 2
-  test:
+  test-doc-deploy:
     jobs:
       - test_archlinux
+      - coverage:
+          requires:
+            - test_archlinux
       - deploy:
           filters:
             branches:
               only: master
           requires:
             - test_archlinux
+            - coverage
+
+  nightly-build:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+                - dev
+    jobs:
+      - test_archlinux
