@@ -5,7 +5,6 @@ from apistrap.types import TupleType
 from schematics import Model
 from schematics.exceptions import DataError
 from schematics.types import IntType, ModelType, StringType, BooleanType, ListType, FloatType
-from typing import List
 
 
 class Inner(Model):
@@ -15,23 +14,22 @@ class Inner(Model):
 
 class SimpleTuple(Model):
     x: str = StringType(required=True)
-    t: (str, int) = TupleType([StringType, IntType])
+    t: (str, str) = TupleType(StringType, 2)
 
 
 class SimpleLargerTuple(Model):
     x: str = StringType(required=True)
-    t: (str, int, bool, List[int], List[int]) = \
-        TupleType([StringType, IntType, BooleanType, ListType(IntType), ListType(IntType)], required=True)
-    d: (float, List[str]) = TupleType([FloatType, ListType(StringType)], required=True)
+    t: (str, str, str, str) = TupleType(StringType, 4, required=True)
+    d: (float, float, float) = TupleType(FloatType, 3, required=True)
 
 
 class ModelInTuple(Model):
     x: str = StringType(required=True)
-    t: (Inner, int) = TupleType([ModelType(Inner), IntType], required=True)
+    t: (Inner, Inner) = TupleType(ModelType(Inner), 2, required=True)
 
 
 SIMPLE_OK_INPUTS = [
-    {'x': 'hello', 't': ['dolly', 42]},
+    {'x': 'hello', 't': ['dolly', 'how-are-you']},
 ]
 
 
@@ -53,10 +51,9 @@ def test_simple_to_primitive(payload):
 SIMPLE_WRONG_INPUTS = [
     {'x': 'hello', 't': 42},  # not a tuple
     {'x': 'hello', 't': {}},  # not a tuple
-    {'x': 'hello', 't': [{}, 42.2]},  # first position (dict instead of string)
+    {'x': 'hello', 't': [{}, ""]},  # first position (dict instead of string)
     {'x': 'hello', 't': ['dolly', 42.2]},  # second position (float instead of int)
-    {'x': 'hello', 't': ['dolly', 42, 1]},  # too long
-    {'x': 'hello', 't': [42, 'dolly']},  # reversed types
+    {'x': 'hello', 't': ['dolly', 'spam', 1]},  # too long
     {'x': 'hello', 't': ['dolly']},  # too short
 ]
 
@@ -69,7 +66,7 @@ def test_simple_wrong(payload):
 
 
 LARGER_OK_INPUTS = [
-    {'x': 'hello', 't': ['dolly', 42, True, [1, 2], [0]], 'd': [0.01, ['x', 'y']]},
+    {'x': 'hello', 't': ['dolly', 'spam', 'eggs', 'sausage'], 'd': [0.01, 0.2, 0.42]},
 ]
 
 
@@ -90,11 +87,11 @@ def test_larger_to_primitive(payload):
 
 LARGER_WRONG_INPUTS = [
     {'x': 'hello', 't': ['dolly', 42, True, [1, 2], [0]], 'd': [0.01, [0, 5]]},  # incorrect list type
-    {'x': 'hello', 't': 0, 'd': [0.01, ['x', 'y']]},  # second position (not a tuple)
-    {'x': 'hello', 't': ['dolly', 42, True, [1, 2], [0]], 'd': {}},  # third position (not a tuple)
-    {'x': 'hey', 't': ['dolly', 42, True, 0, [0]], 'd': [0.01, ['x', 'y']]},  # second position (int instead of list)
-    {'x': 'hey', 't': ['dolly', 42, True, [1, 2], [0], 2], 'd': [0.01, ['x', 'y']]},  # second position (too long)
-    {'x': 'hey', 't': [0.01, ['x', 'y']], 'd': ['dolly', 42, True, [1, 2], [0]]},  # reversed second and third
+    {'x': 'hello', 't': 0, 'd': [0.1, 0.2, 0.3]},  # second position (not a tuple)
+    {'x': 'hello', 't': ['w', 'x', 'y', 'z'], 'd': {}},  # third position (not a tuple)
+    {'x': 'hey', 't': ['dolly', 42, 'spam', 'eggs'], 'd': [0.01, 0.02, 0.03]},  # second position (int instead of str)
+    {'x': 'hey', 't': ['dolly', 'spam', 'eggs', 'sausage', 'spam'], 'd': [0.01, 0.02, 0.03]},  # second position (too long)
+    {'x': 'hey', 't': [0.01, 0.02, 0.03], 'd': ['dolly', 'spam', 'eggs', 'sausage']},  # reversed second and third
 ]
 
 
@@ -106,7 +103,7 @@ def test_simple_wrong(payload):
 
 
 MODELINTUPLE_OK_INPUTS = [
-    {'x': 'hello', 't': [{'s': 'aa', 'i': 12}, 42]},
+    {'x': 'hello', 't': [{'s': 'aa', 'i': 12}, {'s': 'aa', 'i': 12}]},
 ]
 
 
@@ -116,7 +113,8 @@ def test_modelintuple_ok(payload):
     model.validate()
     assert model.x == payload['x']
     assert set(model.t[0]) == set(payload['t'][0])
-    assert model.t[1] == payload['t'][1]
+    assert model.t[1]["s"] == payload['t'][1]["s"]
+    assert model.t[1]["i"] == payload['t'][1]["i"]
 
 
 @pytest.mark.parametrize('payload', MODELINTUPLE_OK_INPUTS)
@@ -129,12 +127,13 @@ def test_modelintuple_to_primitive(payload):
 
 
 MODELINTUPLE_WRONG_INPUTS = [
-    {'x': 'hello', 't': [[], 42]},  # first position (list instead of dict)
-    {'x': 'hello', 't': [{'s': 'aa'}, 42]},  # first position (incomplete first position)
-    {'x': 'hello', 't': [{'s': 'aa', 'i': 'a'}, 42]},  # first position (string instead of int)
-    {'x': 'hello', 't': [{'s': 'aa', 'i': 12, 'a': 'a'}, 42]},  # first position (too long)
-    {'x': 'hello', 't': [{'s': 'aa', 'i': 12}, 42.1]},  # second position (float instead of int)
-    {'x': 'hello', 't': [{'s': 'aa', 'i': 12}, 42, 5]},  # second position (too long)
+    {'x': 'hello', 't': [[], {'s': 'aa', 'i': 12}]},  # first position (list instead of dict)
+    {'x': 'hello', 't': [{'s': 'aa'}, {'s': 'aa', 'i': 12}]},  # first position (incomplete first position)
+    {'x': 'hello', 't': [{'s': 'aa', 'i': 'a'}, {'s': 'aa', 'i': 12}]},  # first position (string instead of int)
+    {'x': 'hello', 't': [{'s': 'aa', 'i': 12, 'a': 'a'}, {'s': 'aa', 'i': 12}]},  # first position (too long)
+    {'x': 'hello', 't': [{'s': 'aa', 'i': 12}, {'s': 'aa', 'i': "spam"}]},  # second position (str instead of int)
+    {'x': 'hello', 't': [{'s': 'aa', 'i': 12}, {'s': 'aa', 'i': 12}, 42]},  # second position (too long)
+    {'x': 'hello', 't': [{'s': 'aa', 'i': 12}, {'s': 'aa', 'i': 12}, {'s': 'aa', 'i': 12}]},  # second position (too long)
     {'x': 'hello', 't': [{'s': 'aa', 'i': 12}]},  # second position (missing)
 ]
 
@@ -147,12 +146,12 @@ def test_modelintuple_wrong(payload):
 
 
 def test_mock():
-    tt = TupleType([ModelType(Inner), IntType], required=True).mock()
+    tt = TupleType(IntType, 2, required=True).mock()
     assert len(tt) == 2
-    assert isinstance(tt[0], Inner)
+    assert isinstance(tt[0], int)
     assert isinstance(tt[1], int)
 
 
 def test_repr():
-    tt = TupleType([StringType, IntType], required=True)
-    assert tt._repr_info() == 'TupleType(StringType, IntType)'
+    tt = TupleType(StringType, 4, required=True)
+    assert tt._repr_info() == 'TupleType(StringType, 4)'
