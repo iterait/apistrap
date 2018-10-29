@@ -1,4 +1,5 @@
 from typing import Type, Generator, Dict, Any
+from inspect import getmro
 
 from schematics import Model
 from schematics.types.base import (BaseType, NumberType, IntType, LongType, FloatType,
@@ -61,12 +62,22 @@ SCHEMATICS_OPTIONS_TO_JSON_SCHEMA = {
     'regex': 'pattern',
     'min_value': 'minimum',
     'max_value': 'maximum',
+    'min_size': 'minItems',
+    'max_size': 'maxItems'
 }
+
+
+def _get_field_type(field: BaseType):
+    for cls in getmro(field.__class__):
+        if cls in SCHEMATICS_TYPE_TO_JSON_TYPE.keys():
+            return SCHEMATICS_TYPE_TO_JSON_TYPE[cls]
+
+    return 'string'
 
 
 def _primitive_field_to_schema_object(field: BaseType) -> Dict[str, str]:
     schema = {
-        "type": SCHEMATICS_TYPE_TO_JSON_TYPE.get(field.__class__, 'string')
+        "type": _get_field_type(field)
     }
 
     for schematics_attr, json_schema_attr in SCHEMATICS_OPTIONS_TO_JSON_SCHEMA.items():
