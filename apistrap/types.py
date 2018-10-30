@@ -3,8 +3,9 @@ from io import BytesIO
 from typing import Union
 from typing.io import BinaryIO
 
+import numpy as np
 from schematics.exceptions import BaseError, CompoundError
-from schematics.types import ListType
+from schematics.types import ListType, FloatType
 
 
 class FileResponse:
@@ -70,3 +71,14 @@ class TupleType(ListType):
             shaped = self.field.export(value, format, context)
             data.append(shaped)
         return data
+
+
+class NonNanFloatType(FloatType):
+    """
+    FloatType replacing NaN to zeros when transformed to JSON.
+    Good for endpoint responses since JSON doesn't support NaNs but Python does.
+    """
+    def to_native(self, value, context=None):
+        if np.isreal(value) and np.isscalar(value) and np.isnan(value):
+            value = 0.0
+        return super().to_native(value, context)
