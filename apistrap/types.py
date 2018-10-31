@@ -4,7 +4,7 @@ from typing import Union
 from typing.io import BinaryIO
 
 import numpy as np
-from schematics.exceptions import BaseError, CompoundError
+from schematics.exceptions import BaseError, CompoundError, ValidationError
 from schematics.types import ListType, FloatType
 
 
@@ -78,7 +78,16 @@ class NonNanFloatType(FloatType):
     FloatType replacing NaN to zeros when transformed to JSON.
     Good for endpoint responses since JSON doesn't support NaNs but Python does.
     """
+
+    _NOT_SET_VALUE = object()
+
+    def __init__(self, default_value: Union[float, object]=_NOT_SET_VALUE, **kwargs):
+        self._default_value = default_value
+        super().__init__(**kwargs)
+
     def to_native(self, value, context=None):
-        if np.isreal(value) and np.isscalar(value) and np.isnan(value):
-            value = 0.0
+        if np.isreal(value) and np.isscalar(value) and np.isnan(value):  # detect NaN
+            if self._default_value == NonNanFloatType._NOT_SET_VALUE:  # user hasn't set the default value
+                raise ValidationError('The value is NaN')
+            value = self._default_value
         return super().to_native(value, context)
