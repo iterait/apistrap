@@ -5,8 +5,8 @@ from apistrap.errors import ApiClientError, ApiServerError
 
 
 @pytest.fixture()
-def app_with_errors(swagger):
-    app = web.Application()
+def app_with_errors(aiohttp_apistrap):
+    app = web.Application(debug=True)
     routes = web.RouteTableDef()
 
     @routes.get("/client_error")
@@ -22,6 +22,7 @@ def app_with_errors(swagger):
         raise RuntimeError("Runtime error occurred")
 
     app.add_routes(routes)
+    aiohttp_apistrap.init_app(app)
     yield app
 
 
@@ -47,7 +48,7 @@ async def test_server_error_handler(app_with_errors, aiohttp_client):
     response = await client.get("/server_error")
     assert response.status == 500
     data = await response.json()
-    assert 'debug_data' in response.json
+    assert 'debug_data' in data
     assert data['debug_data']['exception_type'] == 'ApiServerError'
 
 
