@@ -126,39 +126,49 @@ class RespondsWithDecorator:
         innermost_func = _get_wrapped_function(wrapped_func)
         self.outermost_decorators[innermost_func] = self
 
-        @wraps(wrapped_func)
-        def wrapper(*args, **kwargs):
-            response = wrapped_func(*args, **kwargs)
-
-            if isinstance(response, Response):
-                return response
-            if not isinstance(response, self._response_class):
-                if self.outermost_decorators[innermost_func] == self:
-                    raise UnexpectedResponseError(type(response))
-                return response
-            if isinstance(response, FileResponse):
-                return send_file(filename_or_fp=response.filename_or_fp,
-                                 mimetype=self._mimetype,
-                                 as_attachment=response.as_attachment,
-                                 attachment_filename=response.attachment_filename,
-                                 add_etags=response.add_etags,
-                                 cache_timeout=response.cache_timeout,
-                                 conditional=response.conditional,
-                                 last_modified=response.last_modified)
-
-            try:
-                response.validate()
-            except DataError as e:
-                raise InvalidResponseError(e.errors) from e
-
-            response = jsonify(response.to_primitive())
-            response.status_code = self._code
-            return response
+        if inspect.iscoroutinefunction(wrapped_func):
+            @wraps(wrapped_func)
+            async def wrapper(*args, **kwargs):
+                response = await wrapped_func(*args, **kwargs)
+                is_last_decorator = self.outermost_decorators[innermost_func] == self
+                return self._process_response(response, is_last_decorator)
+        else:
+            @wraps(wrapped_func)
+            def wrapper(*args, **kwargs):
+                response = wrapped_func(*args, **kwargs)
+                is_last_decorator = self.outermost_decorators[innermost_func] == self
+                return self._process_response(response, is_last_decorator)
 
         return wrapper
 
     def _get_schema_object(self):
         return schematics_model_to_schema_object(self._response_class)
+
+    def _process_response(self, response, is_last_decorator: bool):
+        if isinstance(response, Response):
+            return response
+        if isinstance(response, FileResponse):
+            return send_file(filename_or_fp=response.filename_or_fp,
+                             mimetype=self._mimetype,
+                             as_attachment=response.as_attachment,
+                             attachment_filename=response.attachment_filename,
+                             add_etags=response.add_etags,
+                             cache_timeout=response.cache_timeout,
+                             conditional=response.conditional,
+                             last_modified=response.last_modified)
+        if not isinstance(response, self._response_class):
+            if is_last_decorator:
+                raise UnexpectedResponseError(type(response))
+            return response  # Let's hope the next RespondsWithDecorator takes care of the response
+
+        try:
+            response.validate()
+        except DataError as e:
+            raise InvalidResponseError(e.errors) from e
+
+        response = jsonify(response.to_primitive())
+        response.status_code = self._code
+        return response
 
 
 class AcceptsDecorator:
@@ -189,28 +199,47 @@ class AcceptsDecorator:
         if request_arg is None:
             raise TypeError("no argument of type {} found".format(self._request_class))
 
-        @wraps(wrapped_func)
-        def wrapper(*args, **kwargs):
-            if request.content_type != "application/json":
-                raise ApiClientError("Unsupported media type, JSON is expected")
-
-            bound_args = signature.bind_partial(*args, **kwargs)
-            if request_arg.name not in bound_args.arguments:
-                request_object = self._request_class.__new__(self._request_class)
-
-                try:
-                    request_object.__init__(request.json, validate=True, partial=False, strict=True)
-                except DataError as e:
-                    raise InvalidFieldsError(e.errors) from e
-
-                new_kwargs = {request_arg.name: request_object}
-                new_kwargs.update(**kwargs)
-                kwargs = new_kwargs
-
-            return wrapped_func(*args, **kwargs)
+        if inspect.iscoroutinefunction(wrapped_func):
+            @wraps(wrapped_func)
+            async def wrapper(*args, **kwargs):
+                self._check_request_type(*args, **kwargs)
+                body = await self._get_request_json(*args, **kwargs)
+                kwargs = self._process_request_kwargs(body, signature, request_arg, *args, **kwargs)
+                return await wrapped_func(*args, **kwargs)
+        else:
+            @wraps(wrapped_func)
+            def wrapper(*args, **kwargs):
+                self._check_request_type(*args, **kwargs)
+                body = self._get_request_json()
+                kwargs = self._process_request_kwargs(body, signature, request_arg, *args, **kwargs)
+                return wrapped_func(*args, **kwargs)
 
         _add_ignored_param(wrapper, request_arg.name)
         return wrapper
+
+    def _check_request_type(self, *args, **kwargs):
+        if self._get_request_content_type(*args, **kwargs) != "application/json":
+            raise ApiClientError("Unsupported media type, JSON is expected")
+
+    def _process_request_kwargs(self, body, signature, request_arg, *args, **kwargs):
+        bound_args = signature.bind_partial(*args, **kwargs)
+        if request_arg.name not in bound_args.arguments:
+            request_object = self._request_class.__new__(self._request_class)
+
+            try:
+                request_object.__init__(body, validate=True, partial=False, strict=True)
+            except DataError as e:
+                raise InvalidFieldsError(e.errors) from e
+
+            new_kwargs = {request_arg.name: request_object}
+            new_kwargs.update(**kwargs)
+            return new_kwargs
+
+    def _get_request_content_type(self, *args, **kwargs):
+        return request.content_type
+
+    def _get_request_json(self, *args, **kwargs):
+        return request.json
 
 
 class TagsDecorator:

@@ -21,6 +21,6 @@ setup(name='apistrap',
       include_package_data=True,
       zip_safe=False,
       setup_requires=['pytest-runner'],
-      tests_require=['pytest', 'pytest-mock', 'pytest-flask'],
+      tests_require=['pytest', 'pytest-mock', 'pytest-flask', 'pytest-aiohttp'],
       install_requires=['flasgger', 'flask', 'schematics', 'more_itertools'],
       )
