@@ -10,7 +10,7 @@ from aiohttp.web_response import Response
 from pathlib import Path
 from schematics import Model
 from schematics.exceptions import DataError
-from typing import Type, Optional, Coroutine, Callable, Tuple, Any, List
+from typing import Type, Optional, Coroutine, Callable, Tuple, Any
 
 from apistrap import Swagger
 from apistrap.decorators import RespondsWithDecorator, AcceptsDecorator
@@ -22,7 +22,7 @@ from apistrap.utils import format_exception
 
 class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
     async def _process_response(self, response, is_last_decorator: bool, *args, **kwargs):
-        if isinstance(response, Response):
+        if isinstance(response, Response) or isinstance(response, web.StreamResponse):
             return response
         if isinstance(response, FileResponse):
             # TODO consider implementing add_etags, cache_timeout and conditional
