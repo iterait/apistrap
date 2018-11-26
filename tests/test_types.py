@@ -1,10 +1,11 @@
 import pytest
 
-from apistrap.types import TupleType
-
+import numpy as np
 from schematics import Model
-from schematics.exceptions import DataError
-from schematics.types import IntType, ModelType, StringType, BooleanType, ListType, FloatType
+from schematics.exceptions import DataError, ValidationError
+from schematics.types import IntType, ModelType, StringType, FloatType
+
+from apistrap.types import TupleType, NonNanFloatType
 
 
 class Inner(Model):
@@ -155,3 +156,27 @@ def test_mock():
 def test_repr():
     tt = TupleType(StringType, 4, required=True)
     assert tt._repr_info() == 'TupleType(StringType, 4)'
+
+
+@pytest.mark.parametrize('default_value', [0.0, 42])
+def test_nonnan_float_default_value(default_value):
+    class NonNanModel(Model):
+        x: float = NonNanFloatType(required=True, default_value=default_value)
+        y: float = NonNanFloatType(required=True, default_value=default_value)
+
+    payload = {'x': 12.5, 'y': np.nan}
+    model = NonNanModel(payload)
+    model.validate()
+
+    assert model.x == payload['x']
+    assert model.y == default_value
+
+
+def test_nonnan_float_raise():
+    class NonNanModel(Model):
+        x: float = NonNanFloatType(required=True)
+
+    payload = {'x': np.nan}
+    with pytest.raises(DataError):
+        model = NonNanModel(payload)
+        model.validate()
