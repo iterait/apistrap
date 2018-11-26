@@ -131,7 +131,7 @@ class RespondsWithDecorator:
             async def wrapper(*args, **kwargs):
                 response = await wrapped_func(*args, **kwargs)
                 is_last_decorator = self.outermost_decorators[innermost_func] == self
-                return self._process_response(response, is_last_decorator)
+                return await self._process_response(response, is_last_decorator, *args, **kwargs)
         else:
             @wraps(wrapped_func)
             def wrapper(*args, **kwargs):
@@ -144,7 +144,7 @@ class RespondsWithDecorator:
     def _get_schema_object(self):
         return schematics_model_to_schema_object(self._response_class)
 
-    def _process_response(self, response, is_last_decorator: bool):
+    def _process_response(self, response, is_last_decorator: bool, *args, **kwargs):
         if isinstance(response, Response):
             return response
         if isinstance(response, FileResponse):

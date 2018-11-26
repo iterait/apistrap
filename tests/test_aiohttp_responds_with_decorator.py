@@ -1,4 +1,5 @@
 import contextlib
+import io
 import pytest
 from aiohttp import web
 from schematics import Model
@@ -7,6 +8,7 @@ from unittest import mock
 
 from apistrap.aiohttp import ErrorHandlerMiddleware
 from apistrap.errors import UnexpectedResponseError, InvalidResponseError
+from apistrap.types import FileResponse
 
 
 class OkResponse(Model):
@@ -27,7 +29,7 @@ class RequestModel(Model):
 
 
 @pytest.fixture()
-def app_with_responds_with(aiohttp_apistrap):
+def app_with_responds_with(aiohttp_apistrap, tmpdir):
     app = web.Application()
     routes = web.RouteTableDef()
 
@@ -54,6 +56,24 @@ def app_with_responds_with(aiohttp_apistrap):
     @aiohttp_apistrap.responds_with(ErrorResponse, code=400)
     async def invalid(request):
         return OkResponse(dict())
+
+    @routes.get("/file")
+    @aiohttp_apistrap.responds_with(FileResponse)
+    async def get_file(request):
+        message = 'hello'
+        return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
+                            as_attachment=True,
+                            attachment_filename='hello.txt')
+
+    @routes.get("/file_by_path")
+    @aiohttp_apistrap.responds_with(FileResponse)
+    async def get_file_by_path(request):
+        path = tmpdir.join("file.txt")
+        path.write(b'hello')
+
+        return FileResponse(filename_or_fp=str(path),
+                            as_attachment=True,
+                            attachment_filename='hello.txt')
 
     app.add_routes(routes)
     aiohttp_apistrap.init_app(app)
@@ -115,5 +135,11 @@ async def test_invalid(app_with_responds_with, aiohttp_client):
         assert holder.exc is not None
         assert isinstance(holder.exc, InvalidResponseError)
 
+
+@pytest.mark.parametrize('endpoint', ['/file', '/file_by_path'])
+async def test_file_response(aiohttp_client, app_with_responds_with, endpoint):
+    client = await aiohttp_client(app_with_responds_with)
+    response = await client.get(endpoint)
+    assert await response.read() == b'hello'
 
 # TODO test file response once it's finished

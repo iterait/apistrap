@@ -1,9 +1,13 @@
+from itertools import chain
+
 import json
 import logging
+import mimetypes
 from aiohttp import web
 from aiohttp.web_exceptions import HTTPError
 from aiohttp.web_request import BaseRequest
 from aiohttp.web_response import Response
+from pathlib import Path
 from schematics import Model
 from schematics.exceptions import DataError
 from typing import Type, Optional, Coroutine, Callable, Tuple, Any
@@ -17,11 +21,47 @@ from apistrap.utils import format_exception
 
 
 class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
-    def _process_response(self, response, is_last_decorator: bool):
+    async def _process_response(self, response, is_last_decorator: bool, *args, **kwargs):
         if isinstance(response, Response):
             return response
         if isinstance(response, FileResponse):
-            return web.FileResponse(response.filename_or_fp)  # TODO
+            # TODO consider implementing add_etags, cache_timeout and conditional
+            headers = {}
+
+            if self._mimetype:
+                headers['Content-Type'] = self._mimetype
+            elif response.attachment_filename:
+                headers['Content-Type'] = mimetypes.guess_type(response.attachment_filename)[0]
+
+            if response.last_modified is not None:
+                headers['Last-Modified'] = response.last_modified
+
+            if response.as_attachment:
+                if response.attachment_filename is None:
+                    raise TypeError('Missing attachment filename')
+
+                headers['Content-Disposition'] = f'attachment,filename={response.attachment_filename}'
+
+            if isinstance(response.filename_or_fp, str) or isinstance(response.filename_or_fp, Path):
+                return web.FileResponse(response.filename_or_fp, headers=headers)
+            else:
+                stream = web.StreamResponse(headers=headers)
+                request = next(filter(lambda a: isinstance(a, BaseRequest), chain(args, kwargs.values())), None)
+
+                if request is None:
+                    raise TypeError('No request passed to view function')
+
+                await stream.prepare(request)
+
+                while True:
+                    chunk = response.filename_or_fp.read(16536)
+                    if not chunk:
+                        await stream.write_eof()
+                        break
+
+                    await stream.write(chunk)
+
+                return stream
         if not isinstance(response, self._response_class):
             if is_last_decorator:
                 raise UnexpectedResponseError(type(response))
