@@ -30,6 +30,8 @@ class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
 
             if self._mimetype:
                 headers['Content-Type'] = self._mimetype
+            elif response.mimetype:
+                headers['Content-Type'] = response.mimetype
             elif response.attachment_filename:
                 headers['Content-Type'] = mimetypes.guess_type(response.attachment_filename)[0]
 
