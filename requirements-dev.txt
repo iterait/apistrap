@@ -1,3 +1,6 @@
 pytest
 pytest-flask
 pytest-mock
+pytest-aiohttp
+flask
+aiohttp

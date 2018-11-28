@@ -75,7 +75,8 @@ class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
         except DataError as e:
             raise InvalidResponseError(e.errors) from e
 
-        return web.Response(text=json.dumps(response.to_primitive()), content_type="application/json", status=self._code)
+        return web.Response(text=json.dumps(response.to_primitive()), content_type="application/json",
+                            status=self._code)
 
 
 class AioHTTPAcceptsDecorator(AcceptsDecorator):
@@ -130,7 +131,7 @@ class ErrorHandlerMiddleware:
             if isinstance(exception, handled_type):
                 return handler(exception)
 
-        raise ValueError("Unexpected exception type") from exception
+        raise ValueError(f"Unexpected exception type `{type(exception).__name__}`") from exception
 
     def _handle_server_error(self, exception):
         """
@@ -176,7 +177,8 @@ class ErrorHandlerMiddleware:
             message=exception.text
         )), exception.status_code
 
-    async def __call__(self, request: BaseRequest, handler: Callable[[BaseRequest], Coroutine[Any, Any, Response]]) -> web.Response:
+    async def __call__(self, request: BaseRequest,
+                       handler: Callable[[BaseRequest], Coroutine[Any, Any, Response]]) -> web.Response:
         """
         Invoke the middleware.
 

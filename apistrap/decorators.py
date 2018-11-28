@@ -163,8 +163,8 @@ class RespondsWithDecorator:
 
         try:
             response.validate()
-        except DataError as e:
-            raise InvalidResponseError(e.errors) from e
+        except DataError as ex:
+            raise InvalidResponseError(ex.errors) from ex
 
         response = jsonify(response.to_primitive())
         response.status_code = self._code

@@ -5,8 +5,7 @@ from apistrap.errors import ApiClientError, ApiServerError
 
 
 @pytest.fixture()
-def app_with_errors(aiohttp_apistrap):
-    app = web.Application(debug=True)
+def error_routes():
     routes = web.RouteTableDef()
 
     @routes.get('/client_error')
@@ -21,29 +20,21 @@ def app_with_errors(aiohttp_apistrap):
     def view_3(request):
         raise RuntimeError('Runtime error occurred')
 
-    app.add_routes(routes)
+    yield routes
+
+
+@pytest.fixture()
+def app_with_errors(aiohttp_apistrap, error_routes):
+    app = web.Application(debug=True)
+    app.add_routes(error_routes)
     aiohttp_apistrap.init_app(app)
     yield app
 
 
 @pytest.fixture()
-def app_with_errors_in_production(aiohttp_apistrap):
+def app_with_errors_in_production(aiohttp_apistrap, error_routes):
     app = web.Application(debug=False)
-    routes = web.RouteTableDef()
-
-    @routes.get('/client_error')
-    def view_1(request):
-        raise ApiClientError()
-
-    @routes.get('/server_error')
-    def view_2(request):
-        raise ApiServerError()
-
-    @routes.get('/internal_error')
-    def view_3(request):
-        raise RuntimeError('Runtime error occurred')
-
-    app.add_routes(routes)
+    app.add_routes(error_routes)
     aiohttp_apistrap.init_app(app)
     yield app
 
