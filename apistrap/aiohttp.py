@@ -36,7 +36,7 @@ class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
                 headers['Content-Type'] = mimetypes.guess_type(response.attachment_filename)[0]
 
             if response.last_modified is not None:
-                headers['Last-Modified'] = response.last_modified
+                headers['Last-Modified'] = str(response.last_modified)
 
             if response.as_attachment:
                 if response.attachment_filename is None:
@@ -64,6 +64,7 @@ class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
                     await stream.write(chunk)
 
                 return stream
+
         if not isinstance(response, self._response_class):
             if is_last_decorator:
                 raise UnexpectedResponseError(type(response))

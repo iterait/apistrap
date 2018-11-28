@@ -5,6 +5,7 @@ from aiohttp import web
 from schematics import Model
 from schematics.types import StringType, IntType
 from unittest import mock
+import json
 
 from apistrap.aiohttp import ErrorHandlerMiddleware
 from apistrap.errors import UnexpectedResponseError, InvalidResponseError
@@ -75,6 +76,40 @@ def app_with_responds_with(aiohttp_apistrap, tmpdir):
                             as_attachment=True,
                             attachment_filename='hello.txt')
 
+    @routes.get('/file_without_name')
+    @aiohttp_apistrap.responds_with(FileResponse)
+    async def get_file_without_name(request):
+        message = 'hello'
+        return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
+                            as_attachment=True)
+
+    @routes.get('/file_with_mimetype')
+    @aiohttp_apistrap.responds_with(FileResponse)
+    async def get_file_with_mimetype(request):
+        message = '<a href = "www.hello.com"</a>'
+        return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
+                            as_attachment=True,
+                            attachment_filename='hello.html',
+                            mimetype='text/html')
+
+    @routes.get('/file_with_mimetype_decorator')
+    @aiohttp_apistrap.responds_with(FileResponse, mimetype='text/html')
+    async def get_file_with_mimetype(request):
+        message = '<a href = "www.hello.com"</a>'
+        return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
+                            as_attachment=True,
+                            attachment_filename='hello.html',
+                            mimetype='text/plain')
+
+    @routes.get("/file_timestamp")
+    @aiohttp_apistrap.responds_with(FileResponse)
+    async def get_file(request):
+        message = 'hello'
+        return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
+                            as_attachment=True,
+                            attachment_filename='hello.txt',
+                            last_modified=2018)
+
     app.add_routes(routes)
     aiohttp_apistrap.init_app(app)
     yield app
@@ -130,6 +165,7 @@ async def test_weird(app_with_responds_with, aiohttp_client):
 
 async def test_invalid(app_with_responds_with, aiohttp_client):
     client = await aiohttp_client(app_with_responds_with)
+
     with aiohttp_catch_exceptions(app_with_responds_with) as holder:
         await client.get('/invalid')
         assert holder.exc is not None
@@ -142,4 +178,26 @@ async def test_file_response(aiohttp_client, app_with_responds_with, endpoint):
     response = await client.get(endpoint)
     assert await response.read() == b'hello'
 
-# TODO test file response once it's finished
+
+async def test_file_response_error(app_with_responds_with, aiohttp_client):
+    client = await aiohttp_client(app_with_responds_with)
+
+    with aiohttp_catch_exceptions(app_with_responds_with) as holder:
+        await client.get('/file_without_name')
+        assert holder.exc is not None
+        assert isinstance(holder.exc, TypeError)
+
+
+@pytest.mark.parametrize('endpoint', ['/file_with_mimetype', '/file_with_mimetype_decorator'])
+async def test_file_response_mimetype(aiohttp_client, app_with_responds_with, endpoint):
+    client = await aiohttp_client(app_with_responds_with)
+    response = await client.get(endpoint)
+    assert await response.read() == b'<a href = "www.hello.com"</a>'
+    assert response.headers['Content-Type'] == 'text/html'
+
+
+async def test_file_response_timestamp(aiohttp_client, app_with_responds_with):
+    client = await aiohttp_client(app_with_responds_with)
+    response = await client.get('/file_timestamp')
+    assert await response.read() == b'hello'
+    assert response.headers['Last-Modified'] == '2018'
