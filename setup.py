@@ -21,6 +21,9 @@ setup(name='apistrap',
       include_package_data=True,
       zip_safe=False,
       setup_requires=['pytest-runner'],
-      tests_require=['pytest', 'pytest-mock', 'pytest-flask'],
-      install_requires=['flasgger', 'flask', 'schematics', 'more_itertools'],
-      )
+      tests_require=['pytest', 'pytest-mock', 'pytest-flask', 'pytest-aiohttp'],
+      install_requires=['flasgger', 'schematics', 'more_itertools'],
+      extras_require={
+          'flask': ['flask'],
+          'aiohttp': ['aiohttp']
+      })

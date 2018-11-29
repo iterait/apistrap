@@ -133,7 +133,6 @@ def test_error_response(app_with_responds_with, client):
     response = client.get("/error")
     assert response.status_code == 400
     assert len(response.json) == 1
-    print(response.json)
     assert response.json["error_message"] == "Error"
 
 

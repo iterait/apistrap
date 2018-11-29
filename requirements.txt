@@ -1,4 +1,6 @@
 more_itertools
-flask>=1.0
 flasgger
 schematics
+
+flask>=1.0 # optional
+aiohttp # optional

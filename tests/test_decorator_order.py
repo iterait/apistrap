@@ -43,7 +43,6 @@ def decorated_app(app, swagger, request):
 def test_decorator_order(decorated_app, client):
     response = client.get("/swagger.json")
     path = response.json["paths"]["/{path_arg}"]["get"]
-    print(path)
 
     assert len(path["parameters"]) == 2
     assert next(filter(lambda param: param["in"] == "body", path["parameters"]), None) is not None
