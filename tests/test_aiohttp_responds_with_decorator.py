@@ -86,7 +86,7 @@ def app_with_responds_with(aiohttp_apistrap, tmpdir):
     @routes.get('/file_with_mimetype')
     @aiohttp_apistrap.responds_with(FileResponse)
     async def get_file_with_mimetype(request):
-        message = '<a href = "www.hello.com"</a>'
+        message = '<a href="www.hello.com"></a>'
         return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
                             as_attachment=True,
                             attachment_filename='hello.html',
@@ -95,7 +95,7 @@ def app_with_responds_with(aiohttp_apistrap, tmpdir):
     @routes.get('/file_with_mimetype_decorator')
     @aiohttp_apistrap.responds_with(FileResponse, mimetype='text/html')
     async def get_file_with_mimetype(request):
-        message = '<a href = "www.hello.com"</a>'
+        message = '<a href="www.hello.com"></a>'
         return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
                             as_attachment=True,
                             attachment_filename='hello.html',
@@ -192,7 +192,7 @@ async def test_file_response_error(app_with_responds_with, aiohttp_client):
 async def test_file_response_mimetype(aiohttp_client, app_with_responds_with, endpoint):
     client = await aiohttp_client(app_with_responds_with)
     response = await client.get(endpoint)
-    assert await response.read() == b'<a href = "www.hello.com"</a>'
+    assert await response.read() == b'<a href="www.hello.com"></a>'
     assert response.headers['Content-Type'] == 'text/html'
 
 
