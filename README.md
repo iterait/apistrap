@@ -5,15 +5,17 @@
 [![Master Developer](https://img.shields.io/badge/master-Jan%20Buchar-lightgrey.svg?style=flat)]()
 
 This package contains utilities that take care of most of the tedious tasks in the implementation of an HTTP API with 
-Flask:
+Flask or AioHTTP:
 
 - request body validation
 - response serialization and validation
-- API documentation generation using OpenAPI v2 specifications
+- API documentation generation using OpenAPI v2 specifications (Flask only)
 
 ## Usage
 
-First, you need to initialize the extension and bind it to your Flask app.
+First, you need to initialize the extension and bind it to your app.
+
+### Flask
 
 ```python
 from flask import Flask
@@ -31,6 +33,34 @@ you can omit the `app` argument and call `Swagger.init_app(app)` later when you 
 Flask `route()` decorator is always the last applied one (the one on the top). Otherwise, the HTTP handler might not 
 call some of our functions. Also, the `swagger.autodoc()` decorator has to be applied after all the other Swagger 
 decorators.
+
+### AioHTTP
+
+```python
+from aiohttp import web
+from apistrap.aiohttp import AioHTTPApistrap
+
+api = AioHTTPApistrap()
+api.title = "Some title for your API"
+api.description = "A description of the API"
+
+routes = web.RouteTableDef()
+
+@routes.get("/endpoint")
+@api.autodoc()
+def endpoint(request):
+    return web.Response(text="Lorem ipsum")
+
+
+app = web.Application()
+app.add_routes(routes)
+api.init_app(app)
+
+web.run_app(app)
+```
+
+Please note that this is very similar to how Apistrap works with Flask. All decorators that work with Flask routes work
+the same with AioHTTP web routes. Also, you still have to put the route decorators on top.
 
 ### Request Body Parsing
 
