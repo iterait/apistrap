@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='apistrap',
-      version='0.1.0',
+      version='0.2.0',
       description='Iterait REST API utilities',
       classifiers=[
           'Development Status :: 4 - Beta',
@@ -10,7 +10,8 @@ setup(name='apistrap',
           'Operating System :: Unix',
           'Programming Language :: Python :: Implementation :: CPython',
           'License :: OSI Approved :: MIT License',
-          'Programming Language :: Python :: 3.6'
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
       ],
       keywords='api rest http',
       url='https://github.com/iterait/apistrap',
@@ -21,6 +22,9 @@ setup(name='apistrap',
       include_package_data=True,
       zip_safe=False,
       setup_requires=['pytest-runner'],
-      tests_require=['pytest', 'pytest-mock', 'pytest-flask'],
-      install_requires=['flasgger', 'flask', 'schematics', 'more_itertools'],
-      )
+      tests_require=['pytest', 'pytest-mock', 'pytest-flask', 'pytest-aiohttp'],
+      install_requires=['flasgger', 'schematics', 'more_itertools'],
+      extras_require={
+          'flask': ['flask'],
+          'aiohttp': ['aiohttp']
+      })
