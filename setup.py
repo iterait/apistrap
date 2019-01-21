@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='apistrap',
-      version='0.1.0',
+      version='0.2.0',
       description='Iterait REST API utilities',
       classifiers=[
           'Development Status :: 4 - Beta',
@@ -10,7 +10,8 @@ setup(name='apistrap',
           'Operating System :: Unix',
           'Programming Language :: Python :: Implementation :: CPython',
           'License :: OSI Approved :: MIT License',
-          'Programming Language :: Python :: 3.6'
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
       ],
       keywords='api rest http',
       url='https://github.com/iterait/apistrap',
