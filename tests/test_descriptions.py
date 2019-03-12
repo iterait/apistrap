@@ -1,9 +1,10 @@
 import pytest
-from apistrap.flask import Swagger
+from apistrap.flask import FlaskApistrap
 
 
 def test_title_in_swagger_json(app, client):
-    swagger = Swagger(app)
+    swagger = FlaskApistrap()
+    swagger.init_app(app)
     swagger.title = "A title"
 
     response = client.get("/swagger.json")
@@ -11,7 +12,8 @@ def test_title_in_swagger_json(app, client):
 
 
 def test_description_in_swagger_json(app, client):
-    swagger = Swagger(app)
+    swagger = FlaskApistrap()
+    swagger.init_app(app)
     swagger.description = "A description"
 
     response = client.get("/swagger.json")

@@ -18,10 +18,9 @@ class RequestModel(Model):
 
 
 @pytest.fixture()
-def app_with_accepts(app, swagger):
+def app_with_accepts(app, flask_apistrap):
     @app.route("/", methods=["POST"])
-    @swagger.autodoc()
-    @swagger.accepts(RequestModel)
+    @flask_apistrap.accepts(RequestModel)
     def view(req: RequestModel):
         return jsonify()
 
@@ -29,12 +28,13 @@ def app_with_accepts(app, swagger):
 def test_int_subtype(client, app_with_accepts):
     spec = client.get("/swagger.json").json
     path = spec["paths"]["/"]["post"]
-    body = next(filter(lambda item: item["in"] == "body", path["parameters"]), None)
+    body = path["requestBody"]
     assert body is not None
+    assert body["required"]
 
-    ref = extract_definition_name(body["schema"]["$ref"])
-    assert spec["definitions"][ref] == {
-        "title": RequestModel.__name__,
+    ref = extract_definition_name(body["content"]["application/json"]["schema"]["$ref"])
+    assert spec["components"]["schemas"][ref] == {
+        "title": "RequestModel",
         "type": "object",
         "properties": {
             "field": {

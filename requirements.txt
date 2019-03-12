@@ -1,5 +1,5 @@
 more_itertools
-flasgger
+apispec
 schematics
 
 flask>=1.0 # optional

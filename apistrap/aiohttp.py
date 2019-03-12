@@ -12,7 +12,7 @@ from schematics import Model
 from schematics.exceptions import DataError
 from typing import Type, Optional, Coroutine, Callable, Tuple, Any
 
-from apistrap import Swagger
+from apistrap import FlaskApistrap
 from apistrap.decorators import RespondsWithDecorator, AcceptsDecorator
 from apistrap.errors import UnexpectedResponseError, InvalidResponseError, ApiClientError
 from apistrap.schemas import ErrorResponse
@@ -198,7 +198,7 @@ class ErrorHandlerMiddleware:
             )
 
 
-class AioHTTPApistrap(Swagger):
+class AioHTTPApistrap(FlaskApistrap):
     def __init__(self):
         super().__init__()
         self.app: web.Application = None

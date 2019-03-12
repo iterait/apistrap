@@ -1,11 +1,11 @@
 import pytest
 
-from apistrap import Swagger
+from apistrap.flask import FlaskApistrap
 from apistrap.errors import ApiClientError, ApiServerError
 
 
 @pytest.fixture()
-def app_with_errors(app, swagger):
+def app_with_errors(app, flask_apistrap):
     @app.route("/client_error")
     def view_1():
         raise ApiClientError()
@@ -73,7 +73,7 @@ def test_internal_server_error_handler_in_production(app_with_errors, client, ap
 
 @pytest.fixture()
 def app_with_errors_and_no_error_handlers(app):
-    swagger = Swagger()
+    swagger = FlaskApistrap()
     swagger.use_default_error_handlers = False
     swagger.init_app(app)
 

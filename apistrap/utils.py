@@ -26,3 +26,11 @@ def format_exception(exception: Exception) -> Mapping[str, Any]:
         'exception_message': str(exception),
         'traceback': list(flatten([str(s).rstrip('\n').split('\n') for s in traceback_summary.format()]))
     }
+
+
+def snake_to_camel(value):
+    """
+    Convert a string from snake_case to camelCase
+    """
+    result = ''.join(x.capitalize() or '_' for x in value.split('_'))
+    return result[0].lower() + result[1:]

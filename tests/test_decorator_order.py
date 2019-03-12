@@ -22,7 +22,7 @@ decorators = [
 
 
 @pytest.fixture(params=list(itertools.permutations(decorators)))
-def decorated_app(app, swagger, request):
+def decorated_app(app, flask_apistrap, request):
     """
     An app fixture parametrized with all possible orders of different kinds of swagger decorators
     """
@@ -33,10 +33,9 @@ def decorated_app(app, swagger, request):
 
     # Apply our permutation of decorators
     for decorator in request.param:
-        view = decorator(swagger)(view)
+        view = decorator(flask_apistrap)(view)
 
-    # Add the autodoc decorator and register the view function with our Flask app
-    view = swagger.autodoc()(view)
+    # Register the view function with our Flask app
     app.route("/<path_arg>")(view)
 
 
@@ -44,9 +43,10 @@ def test_decorator_order(decorated_app, client):
     response = client.get("/swagger.json")
     path = response.json["paths"]["/{path_arg}"]["get"]
 
-    assert len(path["parameters"]) == 2
-    assert next(filter(lambda param: param["in"] == "body", path["parameters"]), None) is not None
-    assert next(filter(lambda param: param["in"] == "path", path["parameters"]), None) is not None
+    assert len(path["parameters"]) == 1
+    assert path["parameters"][0]["in"] == "path"
+
+    assert path["requestBody"] is not None
 
     assert "201" in path["responses"]
 
