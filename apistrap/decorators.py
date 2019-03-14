@@ -80,8 +80,6 @@ class RespondsWithDecorator:
                     }
                 }
             }
-            if self._mimetype is not None:
-                wrapped_func.specs_dict["produces"] = self._mimetype
         else:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
                 "description": self._description or self._response_class.__name__,
