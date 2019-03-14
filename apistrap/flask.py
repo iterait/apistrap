@@ -62,6 +62,16 @@ class FlaskApistrap(Apistrap):
             return
 
         for rule in self._app.url_map.iter_rules():
+            blueprint_name = rule.endpoint.split(".")[0] if "." in rule.endpoint else None
+
+            # Skip endpoints added by apistrap
+            if blueprint_name == "apistrap":
+                continue
+
+            # Skip Flask's internal static endpoint
+            if rule.endpoint == "static":
+                continue
+
             handler = self._app.view_functions[rule.endpoint]
 
             url = str(rule)
