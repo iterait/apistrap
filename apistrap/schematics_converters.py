@@ -3,7 +3,7 @@ from inspect import getmro
 
 from schematics import Model
 from schematics.types.base import (BaseType, NumberType, IntType, LongType, FloatType,
-                                   DecimalType, BooleanType)
+                                   DecimalType, BooleanType, StringType)
 from schematics.types.compound import ModelType, ListType, DictType
 
 
@@ -41,6 +41,8 @@ def _model_fields_to_schema_object_properties(model: Type[Model]) -> Dict[str, A
                 properties[serialized_name] = _model_dict_to_schema_object(field.field.model_class)
             elif isinstance(field.field, BaseType):
                 properties[serialized_name] = _primitive_dict_to_schema_object(field.field)
+        elif isinstance(field, StringType):
+            properties[serialized_name] = _string_field_to_schema_object(field)
         elif isinstance(field, BaseType):
             properties[serialized_name] = _primitive_field_to_schema_object(field)
 
@@ -85,6 +87,15 @@ def _primitive_field_to_schema_object(field: BaseType) -> Dict[str, str]:
             option_value = getattr(field, schematics_attr)
             if option_value is not None:
                 schema[json_schema_attr] = option_value
+
+    return schema
+
+
+def _string_field_to_schema_object(field: StringType) -> Dict[str, str]:
+    schema = _primitive_field_to_schema_object(field)
+
+    if field.choices is not None:
+        schema["enum"] = field.choices
 
     return schema
 
@@ -159,7 +170,7 @@ def _primitive_dict_to_schema_object(field: BaseType) -> Dict[str, Any]:
 
 def schematics_model_to_schema_object(model: Type[Model]) -> Dict[str, Any]:
     """
-    Convert a Schematics model to an OpenAPI 2 SchemaObject
+    Convert a Schematics model to an OpenAPI 3 SchemaObject
 
     :param model: the model to be converted
     :return: a SchemaObject
