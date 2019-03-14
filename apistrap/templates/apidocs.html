@@ -20,6 +20,12 @@
                 SwaggerUIStandalonePreset
             ]
         });
+        {% if apistrap.oauth_client_id %}
+        window.ui.initOAuth({
+            clientId: "{{ apistrap.oauth_client_id }}",
+            clientSecret: "{{ apistrap.oauth_client_secret or "LoremIpsum" }}"
+        });
+        {% endif %}
     }
 </script>
 </body>

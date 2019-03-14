@@ -224,3 +224,26 @@ class TagsDecorator:
         wrapped_func.specs_dict.setdefault("tags", [])
         wrapped_func.specs_dict["tags"].extend(self._tags)
         return wrapped_func
+
+
+class SecurityDecorator:
+    """
+    A decorator that enforces user authentication and authorization.
+    """
+
+    def __init__(self, extension: 'apistrap.extension.Apistrap', scopes: Sequence[str]):
+        self._extension = extension
+        self._scopes = scopes
+
+    def __call__(self, wrapped_func: Callable):
+        _ensure_specs_dict(wrapped_func)
+        wrapped_func.specs_dict.setdefault("security", [])
+
+        for scheme in self._extension.security_schemes:
+            wrapped_func.specs_dict["security"].append({
+                scheme.name: [*map(str, self._scopes)]
+            })
+
+            wrapped_func = scheme.enforcer(self._scopes)(wrapped_func)
+
+        return wrapped_func
