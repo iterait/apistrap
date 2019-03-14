@@ -84,14 +84,17 @@ class RespondsWithDecorator:
                 wrapped_func.specs_dict["produces"] = self._mimetype
         else:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
-                "$ref": self._swagger.add_response_definition(self._response_class.__name__, {
-                    "description": self._description or self._response_class.__name__,
-                    "content": {
-                        "application/json": {
-                            "schema": self._get_schema_object()
+                "description": self._description or self._response_class.__name__,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": self._swagger.add_schema_definition(
+                                self._response_class.__name__,
+                                self._get_schema_object()
+                            )
                         }
                     }
-                })
+                }
             }
 
         innermost_func = _get_wrapped_function(wrapped_func)

@@ -139,7 +139,7 @@ class Apistrap(metaclass=ABCMeta):
         """
         Add a new request definition to the specification. If a different schema is supplied for an existing definition,
         a ValueError is raised.
-        :param name: the name of the definition (without the '#/definitions/' part)
+        :param name: the name of the definition (without the '#/components/.../' part)
         :param schema: a JsonObject OpenAPI structure
         :return: the full path to the definition in the specification file (can be used directly with $ref)
         """
@@ -157,7 +157,7 @@ class Apistrap(metaclass=ABCMeta):
         """
         Add a new response definition to the specification. If a different schema is supplied for an existing definition,
         a ValueError is raised.
-        :param name: the name of the definition (without the '#/definitions/' part)
+        :param name: the name of the definition (without the '#/components/.../' part)
         :param schema: a JsonObject OpenAPI structure
         :return: the full path to the definition in the specification file (can be used directly with $ref)
         """
@@ -170,6 +170,24 @@ class Apistrap(metaclass=ABCMeta):
             self.spec.components.response(name, schema)
 
         return f"#/components/responses/{name}"
+
+    def add_schema_definition(self, name: str, schema: dict):
+        """
+        Add a new schema definition to the specification. If a different schema is supplied for an existing definition,
+        a ValueError is raised.
+        :param name: the name of the definition (without the '#/components/.../' part)
+        :param schema: a JsonObject OpenAPI structure
+        :return: the full path to the definition in the specification file (can be used directly with $ref)
+        """
+
+        components = self.spec.components.to_dict()
+        if name in components["schemas"]:
+            if components["schemas"][name] != schema:
+                raise ValueError("Conflicting definitions of `{}`".format(name))
+        else:
+            self.spec.components.schema(name, schema)
+
+        return f"#/components/schemas/{name}"
 
     def add_security_scheme(self, scheme: SecurityScheme):
         """

@@ -77,11 +77,11 @@ def test_responses_in_swagger_json(app_with_responds_with, client):
 
     # test ok response
     assert "200" in response.json["paths"]["/"]["get"]["responses"]
-    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["200"]
-    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["200"]["schema"]
-    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["200"]["schema"]["$ref"])
+    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]
+    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"])
 
-    assert response.json["components"]["responses"][ref] == {
+    assert response.json["components"]["schemas"][ref] == {
         "title": "OkResponse",
         "type": "object",
         "properties": {
@@ -100,11 +100,11 @@ def test_responses_in_swagger_json(app_with_responds_with, client):
 
     # test error response
     assert "400" in response.json["paths"]["/"]["get"]["responses"]
-    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["400"]
-    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["400"]["schema"]
-    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["400"]["schema"]["$ref"])
+    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]
+    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]["schema"]
+    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]["schema"]["$ref"])
 
-    assert response.json["components"]["responses"][ref] == {
+    assert response.json["components"]["schemas"][ref] == {
         "title": "ErrorResponse",
         "type": "object",
         "properties": {

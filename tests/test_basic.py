@@ -42,7 +42,10 @@ def test_path_params_present_in_swagger_json(app_basic, client):
         {
             "in": "path",
             "name": "param",
-            "required": True
+            "required": True,
+            "schema": {
+                "type": "string",
+            },
         }, {
             "in": "path",
             "name": "typed_param",
