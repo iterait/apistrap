@@ -219,6 +219,16 @@ class AcceptsDecorator:
         return request.json
 
 
+class IgnoreDecorator:
+    """
+    A decorator that marks an endpoint as ignored so that the extension won't include it in the specification.
+    """
+
+    def __call__(self, wrapped_func: Callable):
+        wrapped_func.apistrap_ignore = True
+        return wrapped_func
+
+
 class TagsDecorator:
     """
     A decorator that adds tags to the OpenAPI specification of the decorated view function.

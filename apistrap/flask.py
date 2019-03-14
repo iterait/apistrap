@@ -74,6 +74,10 @@ class FlaskApistrap(Apistrap):
 
             handler = self._app.view_functions[rule.endpoint]
 
+            # Skip ignored endpoints
+            if getattr(handler, "apistrap_ignore", False):
+                continue
+
             url = str(rule)
             for arg in re.findall('(<([^<>]*:)?([^<>]*)>)', url):
                 url = url.replace(arg[0], '{%s}' % arg[2])

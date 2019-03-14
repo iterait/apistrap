@@ -5,7 +5,7 @@ from apispec.utils import OpenAPIVersion
 from schematics import Model
 from typing import Type, Optional, Dict, Callable, List
 
-from apistrap.decorators import TagsDecorator, IgnoreParamsDecorator, SecurityDecorator
+from apistrap.decorators import TagsDecorator, IgnoreParamsDecorator, SecurityDecorator, IgnoreDecorator
 from apistrap.errors import SwaggerExtensionError
 
 
@@ -185,6 +185,12 @@ class Apistrap(metaclass=ABCMeta):
         A decorator that adds tags to the OpenAPI specification of the decorated view function.
         """
         return TagsDecorator(tags)
+
+    def ignore(self):
+        """
+        A decorator that marks an endpoint as ignored so that the extension won't include it in the specification.
+        """
+        return IgnoreDecorator()
 
     def ignore_params(self, *ignored_params: str):
         """
