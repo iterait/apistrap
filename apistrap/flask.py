@@ -103,13 +103,11 @@ class FlaskApistrap(Apistrap):
                 param_data = {
                     "in": "path",
                     "name": arg.name,
-                    "required": True
-                }
-
-                if arg.annotation in self.PARAMETER_TYPE_MAP:
-                    param_data["schema"] = {
-                        "type": self.PARAMETER_TYPE_MAP[arg.annotation]
+                    "required": True,
+                    "schema": {
+                        "type": self.PARAMETER_TYPE_MAP.get(arg.annotation, "string")
                     }
+                }
 
                 specs_dict["parameters"].append(param_data)
 

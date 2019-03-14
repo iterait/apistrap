@@ -73,17 +73,25 @@ class RespondsWithDecorator:
 
         if self._response_class == FileResponse:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
-                "schema": {'type': 'file'},
-                "description": self._description
+                "description": self._description or self._response_class.__name__,
+                "content": {
+                    self._mimetype or 'application/octet-stream': {
+                        "schema": {'type': 'string', 'format': 'binary'}
+                    }
+                }
             }
             if self._mimetype is not None:
                 wrapped_func.specs_dict["produces"] = self._mimetype
         else:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
-                "schema": {
-                    "$ref": self._swagger.add_response_definition(self._response_class.__name__, self._get_schema_object())
-                },
-                "description": self._description
+                "$ref": self._swagger.add_response_definition(self._response_class.__name__, {
+                    "description": self._description or self._response_class.__name__,
+                    "content": {
+                        "application/json": {
+                            "schema": self._get_schema_object()
+                        }
+                    }
+                })
             }
 
         innermost_func = _get_wrapped_function(wrapped_func)

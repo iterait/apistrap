@@ -28,6 +28,19 @@ class OAuthFlowDefinition:
         self.auth_url = auth_url
         self.token_url = token_url
 
+    def to_dict(self):
+        result = {
+            "scopes": self.scopes
+        }
+
+        if self.auth_url is not None:
+            result["authorizationUrl"] = self.auth_url
+
+        if self.token_url is not None:
+            result["tokenUrl"] = self.token_url
+
+        return result
+
 
 class OAuthSecurity(SecurityScheme):
     def __init__(self, name: str, enforcer: Callable, *flows: OAuthFlowDefinition):
@@ -38,11 +51,7 @@ class OAuthSecurity(SecurityScheme):
         return {
             "type": "oauth2",
             "flows": {
-                flow.flow_type: {
-                    "authorizationUrl": flow.auth_url,
-                    "tokenUrl": flow.token_url,
-                    "scopes": flow.scopes
-                }
+                flow.flow_type: flow.to_dict()
                 for flow in self.flows
             }
         }
