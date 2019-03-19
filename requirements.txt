@@ -4,3 +4,4 @@ schematics
 
 flask>=1.0 # optional
 aiohttp # optional
+jinja2 # optional

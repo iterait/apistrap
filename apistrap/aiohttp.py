@@ -1,3 +1,8 @@
+from os import path
+
+import jinja2
+import re
+from copy import deepcopy
 from itertools import chain
 
 import json
@@ -5,8 +10,9 @@ import logging
 import mimetypes
 from aiohttp import web
 from aiohttp.web_exceptions import HTTPError
-from aiohttp.web_request import BaseRequest
+from aiohttp.web_request import BaseRequest, Request
 from aiohttp.web_response import Response
+from aiohttp.web_urldispatcher import AbstractRoute, PlainResource, DynamicResource
 from pathlib import Path
 from schematics import Model
 from schematics.exceptions import DataError
@@ -17,7 +23,7 @@ from apistrap.errors import UnexpectedResponseError, InvalidResponseError, ApiCl
 from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
-from apistrap.utils import format_exception
+from apistrap.utils import format_exception, snake_to_camel
 
 
 class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
@@ -203,10 +209,96 @@ class AioHTTPApistrap(Apistrap):
         super().__init__()
         self.app: web.Application = None
         self.error_middleware = ErrorHandlerMiddleware(self)
+        self._specs_extracted = False
+        self._jinja_env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(path.join(path.dirname(__file__), "templates"))
+        )
 
     def init_app(self, app: web.Application):
         self.app = app
         app.middlewares.append(self.error_middleware)
+
+        if self.spec_url is not None:
+            app.router.add_route("get", self.spec_url, self._get_spec)
+
+        if self.ui_url is not None:
+            for ui_url in (self.ui_url, self.ui_url + "/"):
+                app.router.add_route("get", ui_url, self._get_ui)
+
+    def _get_spec(self, request: Request):
+        self._extract_specs()
+
+        return web.Response(
+            text=json.dumps(self.to_dict()),
+            content_type="application/json",
+            status=200
+        )
+
+    _get_spec.apistrap_ignore = True
+
+    def _get_ui(self, request: Request):  # TODO
+        """
+        Serves Swagger UI
+        """
+
+        return web.Response(
+            text=self._jinja_env.get_template("apidocs.html").render(apistrap=self),
+            content_type="text/html",
+            status=200
+        )
+
+    _get_ui.apistrap_ignore = True
+
+    def _extract_specs(self):
+        if self._specs_extracted:
+            return
+
+        route: AbstractRoute
+        for route in self.app.router.routes():
+            if getattr(route.handler, "apistrap_ignore", False):
+                continue
+
+            if route.method.lower() not in ["get", "post", "put", "delete", "patch"]:
+                continue
+
+            url = ""
+
+            if isinstance(route.resource, PlainResource):
+                url = route.resource.get_info()["path"]
+            elif isinstance(route.resource, DynamicResource):
+                url = route.resource.get_info()["formatter"]
+
+            self.spec.path(url, {
+                route.method.lower(): self._extract_operation_spec(route)
+            })
+
+        self._specs_extracted = True
+
+    def _extract_operation_spec(self, route: AbstractRoute):
+        specs_dict = deepcopy(getattr(route.handler, "specs_dict", {
+            "parameters": [],
+            "responses": {}
+        }))
+        specs_dict["summary"] = route.handler.__doc__.strip() if route.handler.__doc__ else ""
+
+        if isinstance(route.resource, DynamicResource):
+            parameters = re.findall(r"{([a-zA-Z0-9]+[^}]*)}", route.resource.get_info()["formatter"])
+
+            for arg in parameters:
+                param_data = {
+                    "in": "path",
+                    "name": arg,
+                    "required": True,
+                    "schema": {
+                        "type": "string"  # TODO support other types too
+                    }
+                }
+
+                specs_dict["parameters"].append(param_data)
+
+        specs_dict["operationId"] = snake_to_camel(route.handler.__name__)
+
+        return specs_dict
 
     def _is_bound(self) -> bool:
         return self.app is not None
