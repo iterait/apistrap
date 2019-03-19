@@ -29,6 +29,10 @@ class FlaskApistrap(Apistrap):
         self._specs_extracted = False
 
     def init_app(self, app: Flask):
+        """
+        Bind the extension to a Flask instance
+        :param app: the Flask instance
+        """
         self._app = app
         blueprint = Blueprint("apistrap", __name__, template_folder=path.join(path.dirname(__file__), "templates"))
 
@@ -51,13 +55,22 @@ class FlaskApistrap(Apistrap):
         return self._app is not None
 
     def _get_spec(self):
+        """
+        Serves the OpenAPI specification
+        """
         self._extract_specs()
         return jsonify(self.to_dict())
 
     def _get_ui(self):
+        """
+        Serves Swagger UI
+        """
         return render_template("apidocs.html", apistrap=self)
 
     def _extract_specs(self):
+        """
+        Extract specification data from the Flask app and save it to the underlying Apispec object
+        """
         if self._specs_extracted:
             return
 
@@ -93,6 +106,12 @@ class FlaskApistrap(Apistrap):
         self._specs_extracted = True
 
     def _extract_operation_specs(self, handler):
+        """
+        Extract operation specification data from a Flask view handler
+        :param handler: the Flask handler to extract
+        :return: a dictionary containing the specification data
+        """
+
         specs_dict = deepcopy(getattr(handler, "specs_dict", {
             "parameters": [],
             "responses": {}

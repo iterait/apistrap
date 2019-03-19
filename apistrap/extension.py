@@ -10,7 +10,15 @@ from apistrap.errors import SwaggerExtensionError
 
 
 class SecurityScheme(metaclass=ABCMeta):
-    def __init__(self, name: str, enforcer: Callable):
+    """
+    Description of an authentication method.
+    """
+
+    def __init__(self, name: str, enforcer: Callable[[List[str]], Callable]):
+        """
+        :param name: Name of the scheme (used as the name in the OpenAPI specification)
+        :param enforcer: A decorator that takes a list of scopes and makes sure the user has them
+        """
         self.name = name
         self.enforcer = enforcer
 
@@ -22,13 +30,26 @@ class SecurityScheme(metaclass=ABCMeta):
 
 
 class OAuthFlowDefinition:
+    """
+    A holder for the description of an OpenAPI OAuth flow
+    """
+
     def __init__(self, flow_type: str, scopes: Dict[str, str], auth_url: Optional[str] = None, token_url: Optional[str] = None):
+        """
+        :param flow_type: e.g. password, implicit, ...
+        :param scopes: a dict of scope name : human-readable description of available scopes
+        :param auth_url: OAuth 2 authentication endpoint URL (if applicable)
+        :param token_url: OAuth 2 token endpoint URL (if applicable)
+        """
         self.flow_type = flow_type
         self.scopes = scopes
         self.auth_url = auth_url
         self.token_url = token_url
 
     def to_dict(self):
+        """
+        :return: A dictionary to be used in the OpenAPI specification
+        """
         result = {
             "scopes": self.scopes
         }
@@ -43,7 +64,13 @@ class OAuthFlowDefinition:
 
 
 class OAuthSecurity(SecurityScheme):
+    """
+    A description of an OAuth security scheme with an arbitrary list of OAuth 2 flows
+    """
     def __init__(self, name: str, enforcer: Callable, *flows: OAuthFlowDefinition):
+        """
+        :param flows: A list of OAuth 2 flows allowed by the security scheme
+        """
         super().__init__(name, enforcer)
         self.flows = flows
 
@@ -58,6 +85,9 @@ class OAuthSecurity(SecurityScheme):
 
 
 class Apistrap(metaclass=ABCMeta):
+    """
+    An abstract ancestor for extensions that bind Apistrap to a web framework
+    """
     def __init__(self):
         self.spec = APISpec(openapi_version=OpenAPIVersion("3.0.2"), title="API created with Apistrap", version="1.0.0")
         self.description = None
@@ -69,6 +99,10 @@ class Apistrap(metaclass=ABCMeta):
         self._use_default_error_handlers = True
 
     def to_dict(self):
+        """
+        :return: a dict representation of the OpenAPI spec that can be directly serialized to JSON or YAML
+        """
+
         result = self.spec.to_dict()
 
         if self.description:
@@ -83,6 +117,10 @@ class Apistrap(metaclass=ABCMeta):
         """
 
     def _ensure_not_bound(self, message: str):
+        """
+        Throw an exception if the extension is already bound
+        :param message: the message of the exception
+        """
         if self._is_bound():
             raise SwaggerExtensionError(message)
 
