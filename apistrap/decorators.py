@@ -171,6 +171,8 @@ class AcceptsDecorator:
             "required": True
         }
 
+        wrapped_func.specs_dict["x-codegen-request-body-name"] = "body"
+
         signature = inspect.signature(wrapped_func)
         request_arg = next(filter(lambda arg: issubclass(self._request_class, arg.annotation), signature.parameters.values()), None)
 
