@@ -1,12 +1,11 @@
 from datetime import datetime
-from enum import Enum
 from io import BytesIO
-from typing import Union, Type
+from typing import Union
 from typing.io import BinaryIO
 
 import numpy as np
 from schematics.exceptions import BaseError, CompoundError, ValidationError
-from schematics.types import ListType, FloatType, StringType
+from schematics.types import ListType, FloatType
 
 
 class FileResponse:
@@ -93,17 +92,3 @@ class NonNanFloatType(FloatType):
                 raise ValidationError('The value is NaN')
             value = self._default_value
         return super().to_native(value, context)
-
-
-class StringEnumType(StringType):
-    def __init__(self, enum_type: Type[Enum]):
-        super().__init__(choices=enum_type.choices())
-        self._enum_type = enum_type
-
-    def to_native(self, value, context=None):
-        result = self._enum_type.by_value(value)
-        if result is None:
-            raise ValidationError("Invalid value")
-
-    def to_primitive(self, enum_instance, context=None):
-        return enum_instance.value
