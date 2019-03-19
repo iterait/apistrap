@@ -4,17 +4,55 @@ from os import path
 
 import logging
 import re
+from schematics.exceptions import DataError
 from typing import Type, Optional
 
-from flask import Flask, jsonify, Blueprint, render_template
+from flask import Flask, jsonify, Blueprint, render_template, request, Response, send_file
 from schematics import Model
 from werkzeug.exceptions import HTTPException
 
 from apistrap.decorators import RespondsWithDecorator, AcceptsDecorator
-from apistrap.errors import ApiClientError, ApiServerError
+from apistrap.errors import ApiClientError, ApiServerError, UnexpectedResponseError, InvalidResponseError
 from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
+from apistrap.types import FileResponse
 from apistrap.utils import format_exception, snake_to_camel
+
+
+class FlaskRespondsWithDecorator(RespondsWithDecorator):
+    def _process_response(self, response, is_last_decorator: bool, *args, **kwargs):
+        if isinstance(response, Response):
+            return response
+        if isinstance(response, FileResponse):
+            return send_file(filename_or_fp=response.filename_or_fp,
+                             mimetype=self._mimetype or response.mimetype,
+                             as_attachment=response.as_attachment,
+                             attachment_filename=response.attachment_filename,
+                             add_etags=response.add_etags,
+                             cache_timeout=response.cache_timeout,
+                             conditional=response.conditional,
+                             last_modified=response.last_modified)
+        if not isinstance(response, self._response_class):
+            if is_last_decorator:
+                raise UnexpectedResponseError(type(response))
+            return response  # Let's hope the next RespondsWithDecorator takes care of the response
+
+        try:
+            response.validate()
+        except DataError as ex:
+            raise InvalidResponseError(ex.errors) from ex
+
+        response = jsonify(response.to_primitive())
+        response.status_code = self._code
+        return response
+
+
+class FlaskAcceptsDecorator(AcceptsDecorator):
+    def _get_request_content_type(self, *args, **kwargs):
+        return request.content_type
+
+    def _get_request_json(self, *args, **kwargs):
+        return request.json
 
 
 class FlaskApistrap(Apistrap):
@@ -187,7 +225,7 @@ class FlaskApistrap(Apistrap):
 
     def responds_with(self, response_class: Type[Model], *, code: int = 200, description: Optional[str] = None,
                       mimetype: Optional[str] = None):
-        return RespondsWithDecorator(self, response_class, code=code, description=description, mimetype=mimetype)
+        return FlaskRespondsWithDecorator(self, response_class, code=code, description=description, mimetype=mimetype)
 
     def accepts(self, request_class: Type[Model]):
-        return AcceptsDecorator(self, request_class)
+        return FlaskAcceptsDecorator(self, request_class)

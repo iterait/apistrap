@@ -1,8 +1,8 @@
+import abc
 import inspect
 from functools import wraps
 from typing import Type, Sequence, Callable, Optional
 
-from flask import request, jsonify, Response, send_file
 from schematics import Model
 from schematics.exceptions import DataError
 
@@ -117,33 +117,14 @@ class RespondsWithDecorator:
         return schematics_model_to_schema_object(self._response_class)
 
     def _process_response(self, response, is_last_decorator: bool, *args, **kwargs):
-        if isinstance(response, Response):
-            return response
-        if isinstance(response, FileResponse):
-            return send_file(filename_or_fp=response.filename_or_fp,
-                             mimetype=self._mimetype or response.mimetype,
-                             as_attachment=response.as_attachment,
-                             attachment_filename=response.attachment_filename,
-                             add_etags=response.add_etags,
-                             cache_timeout=response.cache_timeout,
-                             conditional=response.conditional,
-                             last_modified=response.last_modified)
-        if not isinstance(response, self._response_class):
-            if is_last_decorator:
-                raise UnexpectedResponseError(type(response))
-            return response  # Let's hope the next RespondsWithDecorator takes care of the response
-
-        try:
-            response.validate()
-        except DataError as ex:
-            raise InvalidResponseError(ex.errors) from ex
-
-        response = jsonify(response.to_primitive())
-        response.status_code = self._code
-        return response
+        """
+        Process a response received from an endpoint handler (i.e. send it)
+        :param response: the response to be processed
+        :param is_last_decorator: True if the current decorator is the outermost one
+        """
 
 
-class AcceptsDecorator:
+class AcceptsDecorator(metaclass=abc.ABCMeta):
     """
     A decorator that validates request bodies against a schema and passes it as an argument to the view function.
     The destination argument must be annotated with the request type.
@@ -215,11 +196,17 @@ class AcceptsDecorator:
             new_kwargs.update(**kwargs)
             return new_kwargs
 
-    def _get_request_content_type(self, *args, **kwargs):
-        return request.content_type
+    @abc.abstractmethod
+    def _get_request_content_type(self, *args, **kwargs) -> str:
+        """
+        Get the value of the Content-Type header of current request
+        """
 
+    @abc.abstractmethod
     def _get_request_json(self, *args, **kwargs):
-        return request.json
+        """
+        Get the JSON content of the request
+        """
 
 
 class IgnoreDecorator:

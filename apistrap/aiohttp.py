@@ -12,9 +12,9 @@ from schematics import Model
 from schematics.exceptions import DataError
 from typing import Type, Optional, Coroutine, Callable, Tuple, Any
 
-from apistrap import FlaskApistrap
 from apistrap.decorators import RespondsWithDecorator, AcceptsDecorator
 from apistrap.errors import UnexpectedResponseError, InvalidResponseError, ApiClientError
+from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
 from apistrap.utils import format_exception
@@ -198,7 +198,7 @@ class ErrorHandlerMiddleware:
             )
 
 
-class AioHTTPApistrap(FlaskApistrap):
+class AioHTTPApistrap(Apistrap):
     def __init__(self):
         super().__init__()
         self.app: web.Application = None
@@ -208,8 +208,11 @@ class AioHTTPApistrap(FlaskApistrap):
         self.app = app
         app.middlewares.append(self.error_middleware)
 
-    def responds_with(self, response_class: Type[Model], *, code: int=200, description: Optional[str]=None,
-                      mimetype: Optional[str]=None):
+    def _is_bound(self) -> bool:
+        return self.app is not None
+
+    def responds_with(self, response_class: Type[Model], *, code: int = 200, description: Optional[str] = None,
+                      mimetype: Optional[str] = None):
         """
         A decorator that fills in response schemas in the Swagger specification. It also converts Schematics models
         returned by view functions to JSON and validates them.
