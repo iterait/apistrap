@@ -97,7 +97,7 @@ class FlaskApistrap(Apistrap):
             "parameters": [],
             "responses": {}
         }))
-        specs_dict["summary"] = handler.__doc__
+        specs_dict["summary"] = handler.__doc__.strip() if handler.__doc__ else ""
 
         signature = inspect.signature(handler)
         ignored = getattr(handler, "_ignored_params", [])
