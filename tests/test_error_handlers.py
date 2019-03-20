@@ -1,7 +1,7 @@
 import pytest
 
-from apistrap.flask import FlaskApistrap
 from apistrap.errors import ApiClientError, ApiServerError
+from apistrap.flask import FlaskApistrap
 
 
 @pytest.fixture()

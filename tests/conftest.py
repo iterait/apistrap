@@ -2,8 +2,8 @@ import pytest
 from flask import Flask
 from pytest_mock import MockFixture
 
-from apistrap.flask import FlaskApistrap
 from apistrap.aiohttp import AioHTTPApistrap
+from apistrap.flask import FlaskApistrap
 
 
 @pytest.fixture(scope='function')

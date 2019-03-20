@@ -1,5 +1,7 @@
 from schematics import Model
-from schematics.types import NumberType, IntType, LongType, FloatType, StringType, ModelType, ListType, DictType
+from schematics.types import (DictType, FloatType, IntType, ListType, LongType,
+                              ModelType, NumberType, StringType)
+
 from apistrap.schematics_converters import schematics_model_to_schema_object
 
 

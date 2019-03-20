@@ -1,4 +1,5 @@
 import pytest
+
 from apistrap.flask import FlaskApistrap
 
 

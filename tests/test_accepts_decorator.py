@@ -3,7 +3,7 @@ import json
 import pytest
 from flask import jsonify
 from schematics import Model
-from schematics.types import StringType, IntType
+from schematics.types import IntType, StringType
 from werkzeug.test import Client
 
 from apistrap.errors import ApiClientError, InvalidFieldsError

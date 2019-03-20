@@ -1,11 +1,12 @@
 import io
+
 import pytest
 from schematics import Model
 from schematics.types import StringType
 
-from apistrap.errors import UnexpectedResponseError, InvalidResponseError
-from apistrap.types import FileResponse
+from apistrap.errors import InvalidResponseError, UnexpectedResponseError
 from apistrap.schemas import EmptyResponse
+from apistrap.types import FileResponse
 
 
 def extract_definition_name(definition_spec: str):

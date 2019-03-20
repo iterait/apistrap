@@ -1,22 +1,19 @@
 import abc
 import inspect
 from functools import wraps
-from typing import Type, Sequence, Callable, Optional
+from typing import Callable, Optional, Sequence, Type
 
 from schematics import Model
 from schematics.exceptions import DataError
 
-from apistrap.errors import ApiClientError, InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
+from apistrap.errors import (ApiClientError, InvalidFieldsError)
 from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.types import FileResponse
 
 
 def _ensure_specs_dict(func: Callable):
     if not hasattr(func, "specs_dict"):
-        func.specs_dict = {
-            "parameters": [],
-            "responses": {}
-        }
+        func.specs_dict = {"parameters": [], "responses": {}}
 
 
 def _add_ignored_param(func: Callable, arg: str):
@@ -60,8 +57,15 @@ class RespondsWithDecorator:
     when we get to the last decorator
     """
 
-    def __init__(self, swagger: 'apistrap.extension.Apistrap', response_class: Type[Model], *,
-                 code: int=200, description: Optional[str]=None, mimetype: Optional[str]=None):
+    def __init__(
+        self,
+        swagger: "apistrap.extension.Apistrap",
+        response_class: Type[Model],
+        *,
+        code: int = 200,
+        description: Optional[str] = None,
+        mimetype: Optional[str] = None
+    ):
         self._response_class = response_class
         self._code = code
         self._swagger = swagger
@@ -75,10 +79,8 @@ class RespondsWithDecorator:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
                 "description": self._description or self._response_class.__name__,
                 "content": {
-                    self._mimetype or 'application/octet-stream': {
-                        "schema": {'type': 'string', 'format': 'binary'}
-                    }
-                }
+                    self._mimetype or "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
+                },
             }
         else:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
@@ -87,24 +89,26 @@ class RespondsWithDecorator:
                     "application/json": {
                         "schema": {
                             "$ref": self._swagger.add_schema_definition(
-                                self._response_class.__name__,
-                                self._get_schema_object()
+                                self._response_class.__name__, self._get_schema_object()
                             )
                         }
                     }
-                }
+                },
             }
 
         innermost_func = _get_wrapped_function(wrapped_func)
         self.outermost_decorators[innermost_func] = self
 
         if inspect.iscoroutinefunction(wrapped_func):
+
             @wraps(wrapped_func)
             async def wrapper(*args, **kwargs):
                 response = await wrapped_func(*args, **kwargs)
                 is_last_decorator = self.outermost_decorators[innermost_func] == self
                 return await self._process_response(response, is_last_decorator, *args, **kwargs)
+
         else:
+
             @wraps(wrapped_func)
             def wrapper(*args, **kwargs):
                 response = wrapped_func(*args, **kwargs)
@@ -130,7 +134,7 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
     The destination argument must be annotated with the request type.
     """
 
-    def __init__(self, swagger: 'apistrap.extension.Apistrap', request_class: Type[Model]):
+    def __init__(self, swagger: "apistrap.extension.Apistrap", request_class: Type[Model]):
         self._swagger = swagger
         self._request_class = request_class
 
@@ -143,31 +147,35 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
                 "application/json": {
                     "schema": {
                         "$ref": self._swagger.add_request_definition(
-                            self._request_class.__name__,
-                            schematics_model_to_schema_object(self._request_class)
+                            self._request_class.__name__, schematics_model_to_schema_object(self._request_class)
                         )
                     }
                 }
             },
-            "required": True
+            "required": True,
         }
 
         wrapped_func.specs_dict["x-codegen-request-body-name"] = "body"
 
         signature = inspect.signature(wrapped_func)
-        request_arg = next(filter(lambda arg: issubclass(self._request_class, arg.annotation), signature.parameters.values()), None)
+        request_arg = next(
+            filter(lambda arg: issubclass(self._request_class, arg.annotation), signature.parameters.values()), None
+        )
 
         if request_arg is None:
             raise TypeError("no argument of type {} found".format(self._request_class))
 
         if inspect.iscoroutinefunction(wrapped_func):
+
             @wraps(wrapped_func)
             async def wrapper(*args, **kwargs):
                 self._check_request_type(*args, **kwargs)
                 body = await self._get_request_json(*args, **kwargs)
                 kwargs = self._process_request_kwargs(body, signature, request_arg, *args, **kwargs)
                 return await wrapped_func(*args, **kwargs)
+
         else:
+
             @wraps(wrapped_func)
             def wrapper(*args, **kwargs):
                 self._check_request_type(*args, **kwargs)
@@ -239,7 +247,7 @@ class SecurityDecorator:
     A decorator that enforces user authentication and authorization.
     """
 
-    def __init__(self, extension: 'apistrap.extension.Apistrap', scopes: Sequence[str]):
+    def __init__(self, extension: "apistrap.extension.Apistrap", scopes: Sequence[str]):
         self._extension = extension
         self._scopes = scopes
 
@@ -248,9 +256,7 @@ class SecurityDecorator:
         wrapped_func.specs_dict.setdefault("security", [])
 
         for scheme in self._extension.security_schemes:
-            wrapped_func.specs_dict["security"].append({
-                scheme.name: [*map(str, self._scopes)]
-            })
+            wrapped_func.specs_dict["security"].append({scheme.name: [*map(str, self._scopes)]})
 
             wrapped_func = scheme.enforcer(self._scopes)(wrapped_func)
 

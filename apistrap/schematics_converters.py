@@ -1,10 +1,11 @@
-from typing import Type, Generator, Dict, Any
 from inspect import getmro
+from typing import Any, Dict, Generator, Type
 
 from schematics import Model
-from schematics.types.base import (BaseType, NumberType, IntType, LongType, FloatType,
-                                   DecimalType, BooleanType, StringType)
-from schematics.types.compound import ModelType, ListType, DictType
+from schematics.types.base import (BaseType, BooleanType, DecimalType,
+                                   FloatType, IntType, LongType, NumberType,
+                                   StringType)
+from schematics.types.compound import DictType, ListType, ModelType
 
 
 def _get_serialized_name(field: BaseType) -> str:
@@ -14,7 +15,7 @@ def _get_serialized_name(field: BaseType) -> str:
     :param field: the model field
     :return: a field name
     """
-    return getattr(field, 'serialized_name', None) or field.name
+    return getattr(field, "serialized_name", None) or field.name
 
 
 def _model_fields_to_schema_object_properties(model: Type[Model]) -> Dict[str, Any]:
@@ -50,22 +51,22 @@ def _model_fields_to_schema_object_properties(model: Type[Model]) -> Dict[str, A
 
 
 SCHEMATICS_TYPE_TO_JSON_TYPE = {
-    NumberType: 'number',
-    IntType: 'integer',
-    LongType: 'integer',
-    FloatType: 'number',
-    DecimalType: 'number',
-    BooleanType: 'boolean',
+    NumberType: "number",
+    IntType: "integer",
+    LongType: "integer",
+    FloatType: "number",
+    DecimalType: "number",
+    BooleanType: "boolean",
 }
 
 SCHEMATICS_OPTIONS_TO_JSON_SCHEMA = {
-    'max_length': 'maxLength',
-    'min_length': 'minLength',
-    'regex': 'pattern',
-    'min_value': 'minimum',
-    'max_value': 'maximum',
-    'min_size': 'minItems',
-    'max_size': 'maxItems'
+    "max_length": "maxLength",
+    "min_length": "minLength",
+    "regex": "pattern",
+    "min_value": "minimum",
+    "max_value": "maximum",
+    "min_size": "minItems",
+    "max_size": "maxItems",
 }
 
 
@@ -74,13 +75,11 @@ def _get_field_type(field: BaseType):
         if cls in SCHEMATICS_TYPE_TO_JSON_TYPE.keys():
             return SCHEMATICS_TYPE_TO_JSON_TYPE[cls]
 
-    return 'string'
+    return "string"
 
 
 def _primitive_field_to_schema_object(field: BaseType) -> Dict[str, str]:
-    schema = {
-        "type": _get_field_type(field)
-    }
+    schema = {"type": _get_field_type(field)}
 
     for schematics_attr, json_schema_attr in SCHEMATICS_OPTIONS_TO_JSON_SCHEMA.items():
         if hasattr(field, schematics_attr):
@@ -109,7 +108,7 @@ def _get_required_fields(model: Type[Model]) -> Generator[str, None, None]:
     """
 
     for field in model._fields.values():
-        if getattr(field, 'required', False):
+        if getattr(field, "required", False):
             yield _get_serialized_name(field)
 
 
@@ -121,9 +120,9 @@ def _model_array_to_schema_object(model: Type[Model]) -> Dict[str, Any]:
     :return: a SchemaObject
     """
     return {
-        'type': 'array',
-        'title': 'List of {}'.format(model.__name__),
-        'items': schematics_model_to_schema_object(model),
+        "type": "array",
+        "title": "List of {}".format(model.__name__),
+        "items": schematics_model_to_schema_object(model),
     }
 
 
@@ -135,9 +134,9 @@ def _model_dict_to_schema_object(model: Type[Model]) -> Dict[str, Any]:
     :return: a SchemaObject
     """
     return {
-        'type': 'object',
-        'title': 'Dictionary of {}'.format(model.__name__),
-        'additionalProperties': schematics_model_to_schema_object(model)
+        "type": "object",
+        "title": "Dictionary of {}".format(model.__name__),
+        "additionalProperties": schematics_model_to_schema_object(model),
     }
 
 
@@ -148,9 +147,9 @@ def _primitive_array_to_schema_object(field: BaseType) -> Dict[str, Any]:
     :return: a SchemaObject
     """
     return {
-        'type': 'array',
-        'title': 'List of {}'.format(field.__class__.__name__),
-        'items': _primitive_field_to_schema_object(field)
+        "type": "array",
+        "title": "List of {}".format(field.__class__.__name__),
+        "items": _primitive_field_to_schema_object(field),
     }
 
 
@@ -162,9 +161,9 @@ def _primitive_dict_to_schema_object(field: BaseType) -> Dict[str, Any]:
     :return: a SchemaObject
     """
     return {
-        'type': 'object',
-        'title': 'Dictionary of {}'.format(field.__class__.__name__),
-        'additionalProperties': _primitive_field_to_schema_object(field)
+        "type": "object",
+        "title": "Dictionary of {}".format(field.__class__.__name__),
+        "additionalProperties": _primitive_field_to_schema_object(field),
     }
 
 
@@ -176,14 +175,14 @@ def schematics_model_to_schema_object(model: Type[Model]) -> Dict[str, Any]:
     :return: a SchemaObject
     """
     schema = {
-        'type': 'object',
-        'title': model.__name__,
-        'properties': (_model_fields_to_schema_object_properties(model)),
+        "type": "object",
+        "title": model.__name__,
+        "properties": (_model_fields_to_schema_object_properties(model)),
     }
 
     required = list(_get_required_fields(model))
 
     if required:
-        schema['required'] = required
+        schema["required"] = required
 
     return schema

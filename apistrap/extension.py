@@ -1,11 +1,13 @@
 import abc
 from abc import ABCMeta
+from typing import Callable, Dict, List, Optional, Type
+
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
 from schematics import Model
-from typing import Type, Optional, Dict, Callable, List
 
-from apistrap.decorators import TagsDecorator, IgnoreParamsDecorator, SecurityDecorator, IgnoreDecorator
+from apistrap.decorators import (IgnoreDecorator, IgnoreParamsDecorator,
+                                 SecurityDecorator, TagsDecorator)
 from apistrap.errors import SwaggerExtensionError
 
 
@@ -23,9 +25,9 @@ class SecurityScheme(metaclass=ABCMeta):
         self.enforcer = enforcer
 
     @abc.abstractmethod
-    def to_dict(self):
+    def to_openapi_dict(self):
         """
-        Get the OpenAPI JSON description of the security scheme
+        Get a JSON-serializable object with an OpenAPI description of the security scheme
         """
 
 
@@ -34,7 +36,9 @@ class OAuthFlowDefinition:
     A holder for the description of an OpenAPI OAuth flow
     """
 
-    def __init__(self, flow_type: str, scopes: Dict[str, str], auth_url: Optional[str] = None, token_url: Optional[str] = None):
+    def __init__(
+        self, flow_type: str, scopes: Dict[str, str], auth_url: Optional[str] = None, token_url: Optional[str] = None
+    ):
         """
         :param flow_type: e.g. password, implicit, ...
         :param scopes: a dict of scope name : human-readable description of available scopes
@@ -46,13 +50,11 @@ class OAuthFlowDefinition:
         self.auth_url = auth_url
         self.token_url = token_url
 
-    def to_dict(self):
+    def to_openapi_dict(self):
         """
         :return: A dictionary to be used in the OpenAPI specification
         """
-        result = {
-            "scopes": self.scopes
-        }
+        result = {"scopes": self.scopes}
 
         if self.auth_url is not None:
             result["authorizationUrl"] = self.auth_url
@@ -67,6 +69,7 @@ class OAuthSecurity(SecurityScheme):
     """
     A description of an OAuth security scheme with an arbitrary list of OAuth 2 flows
     """
+
     def __init__(self, name: str, enforcer: Callable, *flows: OAuthFlowDefinition):
         """
         :param flows: A list of OAuth 2 flows allowed by the security scheme
@@ -74,20 +77,15 @@ class OAuthSecurity(SecurityScheme):
         super().__init__(name, enforcer)
         self.flows = flows
 
-    def to_dict(self):
-        return {
-            "type": "oauth2",
-            "flows": {
-                flow.flow_type: flow.to_dict()
-                for flow in self.flows
-            }
-        }
+    def to_openapi_dict(self):
+        return {"type": "oauth2", "flows": {flow.flow_type: flow.to_openapi_dict() for flow in self.flows}}
 
 
 class Apistrap(metaclass=ABCMeta):
     """
     An abstract ancestor for extensions that bind Apistrap to a web framework
     """
+
     def __init__(self):
         self.spec = APISpec(openapi_version=OpenAPIVersion("3.0.2"), title="API created with Apistrap", version="1.0.0")
         self.description = None
@@ -98,7 +96,7 @@ class Apistrap(metaclass=ABCMeta):
         self._ui_url = "/apidocs"
         self._use_default_error_handlers = True
 
-    def to_dict(self):
+    def to_openapi_dict(self):
         """
         :return: a dict representation of the OpenAPI spec that can be directly serialized to JSON or YAML
         """
@@ -182,7 +180,7 @@ class Apistrap(metaclass=ABCMeta):
         :return: the full path to the definition in the specification file (can be used directly with $ref)
         """
 
-        components = self.spec.components.to_dict()
+        components = self.spec.components.to_openapi_dict()
         if name in components["schemas"]:
             if components["schemas"][name] != schema:
                 raise ValueError("Conflicting definitions of `{}`".format(name))
@@ -200,7 +198,7 @@ class Apistrap(metaclass=ABCMeta):
         :return: the full path to the definition in the specification file (can be used directly with $ref)
         """
 
-        components = self.spec.components.to_dict()
+        components = self.spec.components.to_openapi_dict()
         if name in components["responses"]:
             if components["responses"][name] != schema:
                 raise ValueError("Conflicting definitions of `{}`".format(name))
@@ -218,7 +216,7 @@ class Apistrap(metaclass=ABCMeta):
         :return: the full path to the definition in the specification file (can be used directly with $ref)
         """
 
-        components = self.spec.components.to_dict()
+        components = self.spec.components.to_openapi_dict()
         if name in components["schemas"]:
             if components["schemas"][name] != schema:
                 raise ValueError("Conflicting definitions of `{}`".format(name))
@@ -234,7 +232,7 @@ class Apistrap(metaclass=ABCMeta):
         """
 
         self.security_schemes.append(scheme)
-        self.spec.components.security_scheme(scheme.name, scheme.to_dict())
+        self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
 
     def tags(self, *tags: str):
         """
@@ -261,8 +259,14 @@ class Apistrap(metaclass=ABCMeta):
         return SecurityDecorator(self, scopes)
 
     @abc.abstractmethod
-    def responds_with(self, response_class: Type[Model], *, code: int = 200, description: Optional[str] = None,
-                      mimetype: Optional[str] = None):
+    def responds_with(
+        self,
+        response_class: Type[Model],
+        *,
+        code: int = 200,
+        description: Optional[str] = None,
+        mimetype: Optional[str] = None,
+    ):
         """
         A decorator that fills in response schemas in the Swagger specification. It also converts Schematics models
         returned by view functions to JSON and validates them.

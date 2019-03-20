@@ -1,18 +1,19 @@
 import inspect
-from copy import deepcopy
-from os import path
-
 import logging
 import re
-from schematics.exceptions import DataError
-from typing import Type, Optional
+from copy import deepcopy
+from os import path
+from typing import Optional, Type
 
-from flask import Flask, jsonify, Blueprint, render_template, request, Response, send_file
+from flask import (Blueprint, Flask, Response, jsonify, render_template,
+                   request, send_file)
 from schematics import Model
+from schematics.exceptions import DataError
 from werkzeug.exceptions import HTTPException
 
-from apistrap.decorators import RespondsWithDecorator, AcceptsDecorator
-from apistrap.errors import ApiClientError, ApiServerError, UnexpectedResponseError, InvalidResponseError
+from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator
+from apistrap.errors import (ApiClientError, ApiServerError,
+                             InvalidResponseError, UnexpectedResponseError)
 from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
@@ -24,14 +25,16 @@ class FlaskRespondsWithDecorator(RespondsWithDecorator):
         if isinstance(response, Response):
             return response
         if isinstance(response, FileResponse):
-            return send_file(filename_or_fp=response.filename_or_fp,
-                             mimetype=self._mimetype or response.mimetype,
-                             as_attachment=response.as_attachment,
-                             attachment_filename=response.attachment_filename,
-                             add_etags=response.add_etags,
-                             cache_timeout=response.cache_timeout,
-                             conditional=response.conditional,
-                             last_modified=response.last_modified)
+            return send_file(
+                filename_or_fp=response.filename_or_fp,
+                mimetype=self._mimetype or response.mimetype,
+                as_attachment=response.as_attachment,
+                attachment_filename=response.attachment_filename,
+                add_etags=response.add_etags,
+                cache_timeout=response.cache_timeout,
+                conditional=response.conditional,
+                last_modified=response.last_modified,
+            )
         if not isinstance(response, self._response_class):
             if is_last_decorator:
                 raise UnexpectedResponseError(type(response))
@@ -56,10 +59,7 @@ class FlaskAcceptsDecorator(AcceptsDecorator):
 
 
 class FlaskApistrap(Apistrap):
-    PARAMETER_TYPE_MAP = {
-        int: "integer",
-        str: "string"
-    }
+    PARAMETER_TYPE_MAP = {int: "integer", str: "string"}
 
     def __init__(self):
         super().__init__()
@@ -97,7 +97,7 @@ class FlaskApistrap(Apistrap):
         Serves the OpenAPI specification
         """
         self._extract_specs()
-        return jsonify(self.to_dict())
+        return jsonify(self.to_openapi_dict())
 
     _get_spec.apistrap_ignore = True
 
@@ -128,30 +128,26 @@ class FlaskApistrap(Apistrap):
                 continue
 
             url = str(rule)
-            for arg in re.findall('(<([^<>]*:)?([^<>]*)>)', url):
-                url = url.replace(arg[0], '{%s}' % arg[2])
+            for arg in re.findall("(<([^<>]*:)?([^<>]*)>)", url):
+                url = url.replace(arg[0], "{%s}" % arg[2])
 
             for method in rule.methods:
                 if method.lower() not in ["get", "post", "put", "delete", "patch"]:
                     continue
 
-                self.spec.path(url, {
-                    method.lower(): self._extract_operation_specs(handler)
-                })
+                self.spec.path(url, {method.lower(): self._extract_operation_specs(handler)})
 
         self._specs_extracted = True
 
     def _extract_operation_specs(self, handler):
         """
         Extract operation specification data from a Flask view handler
+        
         :param handler: the Flask handler to extract
         :return: a dictionary containing the specification data
         """
 
-        specs_dict = deepcopy(getattr(handler, "specs_dict", {
-            "parameters": [],
-            "responses": {}
-        }))
+        specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
         specs_dict["summary"] = handler.__doc__.strip() if handler.__doc__ else ""
 
         signature = inspect.signature(handler)
@@ -163,9 +159,7 @@ class FlaskApistrap(Apistrap):
                     "in": "path",
                     "name": arg.name,
                     "required": True,
-                    "schema": {
-                        "type": self.PARAMETER_TYPE_MAP.get(arg.annotation, "string")
-                    }
+                    "schema": {"type": self.PARAMETER_TYPE_MAP.get(arg.annotation, "string")},
                 }
 
                 specs_dict["parameters"].append(param_data)
@@ -193,10 +187,7 @@ class FlaskApistrap(Apistrap):
 
         if self._app.debug:
             logging.exception(exception)
-            error_response = ErrorResponse(dict(
-                message=str(exception),
-                debug_data=format_exception(exception)
-            ))
+            error_response = ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
         else:
             error_response = ErrorResponse(dict(message=str(exception)))
 
@@ -212,17 +203,20 @@ class FlaskApistrap(Apistrap):
         logging.exception(exception)
 
         if self._app.debug:
-            error_response = ErrorResponse(dict(
-                message=str(exception),
-                debug_data=format_exception(exception)
-            ))
+            error_response = ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
         else:
             error_response = ErrorResponse(dict(message="Internal server error"))
 
         return jsonify(error_response.to_primitive()), 500
 
-    def responds_with(self, response_class: Type[Model], *, code: int = 200, description: Optional[str] = None,
-                      mimetype: Optional[str] = None):
+    def responds_with(
+        self,
+        response_class: Type[Model],
+        *,
+        code: int = 200,
+        description: Optional[str] = None,
+        mimetype: Optional[str] = None
+    ):
         return FlaskRespondsWithDecorator(self, response_class, code=code, description=description, mimetype=mimetype)
 
     def accepts(self, request_class: Type[Model]):

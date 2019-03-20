@@ -1,8 +1,8 @@
 import pytest
 from flask import jsonify
 
-from apistrap.flask import FlaskApistrap
 from apistrap.errors import SwaggerExtensionError
+from apistrap.flask import FlaskApistrap
 
 
 def test_swagger_extension_definition_conflict_1():
