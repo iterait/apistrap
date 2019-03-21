@@ -3,16 +3,15 @@ from flask import jsonify
 
 
 @pytest.fixture()
-def app_with_tags(app, swagger):
+def app_with_tags(app, flask_apistrap):
     @app.route("/", methods=["GET"])
-    @swagger.autodoc()
-    @swagger.tags("Hello", "World")
+    @flask_apistrap.tags("Hello", "World")
     def view():
         return jsonify()
 
 
 def test_simple_tags(app_with_tags, client):
-    response = client.get("/swagger.json")
+    response = client.get("/spec.json")
     path = response.json["paths"]["/"]["get"]
 
     assert "tags" in path
@@ -20,17 +19,16 @@ def test_simple_tags(app_with_tags, client):
 
 
 @pytest.fixture()
-def app_with_repeated_tags(app, swagger):
+def app_with_repeated_tags(app, flask_apistrap):
     @app.route("/", methods=["GET"])
-    @swagger.autodoc()
-    @swagger.tags("Tag 1", "Tag 2")
-    @swagger.tags("Tag 3", "Tag 4")
+    @flask_apistrap.tags("Tag 1", "Tag 2")
+    @flask_apistrap.tags("Tag 3", "Tag 4")
     def view():
         return jsonify()
 
 
 def test_repeated_tags(app_with_repeated_tags, client):
-    response = client.get("/swagger.json")
+    response = client.get("/spec.json")
     path = response.json["paths"]["/"]["get"]
 
     assert "tags" in path

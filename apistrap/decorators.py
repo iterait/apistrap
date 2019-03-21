@@ -1,23 +1,19 @@
+import abc
 import inspect
 from functools import wraps
-from typing import Type, Sequence, Callable, Optional
+from typing import Callable, Optional, Sequence, Type
 
-from flask import request, jsonify, Response, send_file
 from schematics import Model
 from schematics.exceptions import DataError
 
-import apistrap.flask
-from apistrap.errors import ApiClientError, InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
+from apistrap.errors import ApiClientError, InvalidFieldsError
 from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.types import FileResponse
 
 
 def _ensure_specs_dict(func: Callable):
     if not hasattr(func, "specs_dict"):
-        func.specs_dict = {
-            "parameters": [],
-            "responses": {}
-        }
+        func.specs_dict = {"parameters": [], "responses": {}}
 
 
 def _add_ignored_param(func: Callable, arg: str):
@@ -40,49 +36,17 @@ def _get_wrapped_function(func: Callable):
     return _get_wrapped_function(wrapped)
 
 
-class AutodocDecorator:
+class IgnoreParamsDecorator:
     """
-    A decorator that generates Swagger metadata based on the signature of the decorated function and black magic.
-    The metadata is collected by Flasgger and used to generate API specs/docs.
+    A decorator that marks specified function parameters as ignored for the purposes of generating a specification
     """
 
-    TYPE_MAP = {
-        int: "integer",
-        str: "string"
-    }
+    def __init__(self, ignored_params: Sequence[str]):
+        self._ignored_params = ignored_params
 
-    def __init__(self, swagger: 'apistrap.flask.Swagger', *, ignored_args: Sequence[str] = ()):
-        self._ignored_args = ignored_args
-
-    def __call__(self, wrapped_func: Callable):
-        _ensure_specs_dict(wrapped_func)
-        signature = inspect.signature(wrapped_func)
-        ignored = list(self._ignored_args)
-        ignored += getattr(wrapped_func, "_ignored_params", [])
-
-        for arg in signature.parameters.values():
-            if arg.name not in ignored:
-                param_data = {
-                    "in": "path",
-                    "name": arg.name
-                }
-
-                if arg.annotation in AutodocDecorator.TYPE_MAP:
-                    param_data["type"] = AutodocDecorator.TYPE_MAP[arg.annotation]
-
-                wrapped_func.specs_dict["parameters"].append(param_data)
-
-        wrapped_func.specs_dict["operationId"] = self._snake_to_camel(wrapped_func.__name__)
-
-        return wrapped_func
-
-    @staticmethod
-    def _snake_to_camel(value):
-        """
-        Convert a string from snake_case to camelCase
-        """
-        result = ''.join(x.capitalize() or '_' for x in value.split('_'))
-        return result[0].lower() + result[1:]
+    def __call__(self, wrapped_func):
+        for param in self._ignored_params:
+            _add_ignored_param(wrapped_func, param)
 
 
 class RespondsWithDecorator:
@@ -97,11 +61,18 @@ class RespondsWithDecorator:
     when we get to the last decorator
     """
 
-    def __init__(self, swagger: 'apistrap.flask.Swagger', response_class: Type[Model], *,
-                 code: int=200, description: Optional[str]=None, mimetype: Optional[str]=None):
+    def __init__(
+        self,
+        apistrap: "apistrap.extension.Apistrap",
+        response_class: Type[Model],
+        *,
+        code: int = 200,
+        description: Optional[str] = None,
+        mimetype: Optional[str] = None
+    ):
         self._response_class = response_class
         self._code = code
-        self._swagger = swagger
+        self._apistrap = apistrap
         self._description = description or self._response_class.__name__
         self._mimetype = mimetype
 
@@ -110,29 +81,38 @@ class RespondsWithDecorator:
 
         if self._response_class == FileResponse:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
-                "schema": {'type': 'file'},
-                "description": self._description
+                "description": self._description or self._response_class.__name__,
+                "content": {
+                    self._mimetype or "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
+                },
             }
-            if self._mimetype is not None:
-                wrapped_func.specs_dict["produces"] = self._mimetype
         else:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
-                "schema": {
-                    "$ref": self._swagger.add_definition(self._response_class.__name__, self._get_schema_object())
+                "description": self._description or self._response_class.__name__,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": self._apistrap.add_schema_definition(
+                                self._response_class.__name__, self._get_schema_object()
+                            )
+                        }
+                    }
                 },
-                "description": self._description
             }
 
         innermost_func = _get_wrapped_function(wrapped_func)
         self.outermost_decorators[innermost_func] = self
 
         if inspect.iscoroutinefunction(wrapped_func):
+
             @wraps(wrapped_func)
             async def wrapper(*args, **kwargs):
                 response = await wrapped_func(*args, **kwargs)
                 is_last_decorator = self.outermost_decorators[innermost_func] == self
                 return await self._process_response(response, is_last_decorator, *args, **kwargs)
+
         else:
+
             @wraps(wrapped_func)
             def wrapper(*args, **kwargs):
                 response = wrapped_func(*args, **kwargs)
@@ -145,68 +125,61 @@ class RespondsWithDecorator:
         return schematics_model_to_schema_object(self._response_class)
 
     def _process_response(self, response, is_last_decorator: bool, *args, **kwargs):
-        if isinstance(response, Response):
-            return response
-        if isinstance(response, FileResponse):
-            return send_file(filename_or_fp=response.filename_or_fp,
-                             mimetype=self._mimetype or response.mimetype,
-                             as_attachment=response.as_attachment,
-                             attachment_filename=response.attachment_filename,
-                             add_etags=response.add_etags,
-                             cache_timeout=response.cache_timeout,
-                             conditional=response.conditional,
-                             last_modified=response.last_modified)
-        if not isinstance(response, self._response_class):
-            if is_last_decorator:
-                raise UnexpectedResponseError(type(response))
-            return response  # Let's hope the next RespondsWithDecorator takes care of the response
-
-        try:
-            response.validate()
-        except DataError as ex:
-            raise InvalidResponseError(ex.errors) from ex
-
-        response = jsonify(response.to_primitive())
-        response.status_code = self._code
-        return response
+        """
+        Process a response received from an endpoint handler (i.e. send it)
+        :param response: the response to be processed
+        :param is_last_decorator: True if the current decorator is the outermost one
+        """
 
 
-class AcceptsDecorator:
+class AcceptsDecorator(metaclass=abc.ABCMeta):
     """
     A decorator that validates request bodies against a schema and passes it as an argument to the view function.
     The destination argument must be annotated with the request type.
     """
 
-    def __init__(self, swagger: 'apistrap.flask.Swagger', request_class: Type[Model]):
-        self._swagger = swagger
+    def __init__(self, apistrap: "apistrap.extension.Apistrap", request_class: Type[Model]):
+        self._apistrap = apistrap
         self._request_class = request_class
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
 
-        wrapped_func.specs_dict["parameters"].append({
-            "in": "body",
-            "name": "body",
+        # TODO parse title from param in docblock
+        wrapped_func.specs_dict["requestBody"] = {
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "$ref": self._apistrap.add_request_definition(
+                            self._request_class.__name__, schematics_model_to_schema_object(self._request_class)
+                        )
+                    }
+                }
+            },
             "required": True,
-            "schema": {
-                "$ref": self._swagger.add_definition(self._request_class.__name__, schematics_model_to_schema_object(self._request_class))
-            }
-        })
+        }
+
+        wrapped_func.specs_dict["x-codegen-request-body-name"] = "body"
 
         signature = inspect.signature(wrapped_func)
-        request_arg = next(filter(lambda arg: issubclass(self._request_class, arg.annotation), signature.parameters.values()), None)
+        request_arg = next(
+            filter(lambda arg: issubclass(self._request_class, arg.annotation), signature.parameters.values()), None
+        )
 
         if request_arg is None:
             raise TypeError("no argument of type {} found".format(self._request_class))
 
         if inspect.iscoroutinefunction(wrapped_func):
+
             @wraps(wrapped_func)
             async def wrapper(*args, **kwargs):
                 self._check_request_type(*args, **kwargs)
                 body = await self._get_request_json(*args, **kwargs)
                 kwargs = self._process_request_kwargs(body, signature, request_arg, *args, **kwargs)
                 return await wrapped_func(*args, **kwargs)
+
         else:
+
             @wraps(wrapped_func)
             def wrapper(*args, **kwargs):
                 self._check_request_type(*args, **kwargs)
@@ -235,11 +208,27 @@ class AcceptsDecorator:
             new_kwargs.update(**kwargs)
             return new_kwargs
 
-    def _get_request_content_type(self, *args, **kwargs):
-        return request.content_type
+    @abc.abstractmethod
+    def _get_request_content_type(self, *args, **kwargs) -> str:
+        """
+        Get the value of the Content-Type header of current request
+        """
 
+    @abc.abstractmethod
     def _get_request_json(self, *args, **kwargs):
-        return request.json
+        """
+        Get the JSON content of the request
+        """
+
+
+class IgnoreDecorator:
+    """
+    A decorator that marks an endpoint as ignored so that the extension won't include it in the specification.
+    """
+
+    def __call__(self, wrapped_func: Callable):
+        wrapped_func.apistrap_ignore = True
+        return wrapped_func
 
 
 class TagsDecorator:
@@ -254,4 +243,25 @@ class TagsDecorator:
         _ensure_specs_dict(wrapped_func)
         wrapped_func.specs_dict.setdefault("tags", [])
         wrapped_func.specs_dict["tags"].extend(self._tags)
+        return wrapped_func
+
+
+class SecurityDecorator:
+    """
+    A decorator that enforces user authentication and authorization.
+    """
+
+    def __init__(self, extension: "apistrap.extension.Apistrap", scopes: Sequence[str]):
+        self._extension = extension
+        self._scopes = scopes
+
+    def __call__(self, wrapped_func: Callable):
+        _ensure_specs_dict(wrapped_func)
+        wrapped_func.specs_dict.setdefault("security", [])
+
+        for scheme in self._extension.security_schemes:
+            wrapped_func.specs_dict["security"].append({scheme.name: [*map(str, self._scopes)]})
+
+            wrapped_func = scheme.enforcer(self._scopes)(wrapped_func)
+
         return wrapped_func

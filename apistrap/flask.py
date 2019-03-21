@@ -1,43 +1,171 @@
-from copy import deepcopy
+import inspect
 import logging
-from typing import Type, Sequence, Optional
+import re
+from copy import deepcopy
+from os import path
+from typing import Optional, Type
 
-from flasgger import Swagger as Flasgger
-from flask import Flask, jsonify, Response
+from flask import Blueprint, Flask, Response, jsonify, render_template, request, send_file
 from schematics import Model
+from schematics.exceptions import DataError
 from werkzeug.exceptions import HTTPException
 
-from apistrap.decorators import AutodocDecorator, RespondsWithDecorator, AcceptsDecorator, TagsDecorator
-from apistrap.errors import SwaggerExtensionError, ApiClientError, ApiServerError
+from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator
+from apistrap.errors import ApiClientError, ApiServerError, InvalidResponseError, UnexpectedResponseError
+from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
-from apistrap.utils import format_exception
+from apistrap.types import FileResponse
+from apistrap.utils import format_exception, snake_to_camel
 
 
-class Swagger(Flasgger):
-    """
-    A Flask extension for semi-automatic generation of OpenAPI specifications on the fly, using view decorators
-    """
+class FlaskRespondsWithDecorator(RespondsWithDecorator):
+    def _process_response(self, response, is_last_decorator: bool, *args, **kwargs):
+        if isinstance(response, Response):
+            return response
+        if isinstance(response, FileResponse):
+            return send_file(
+                filename_or_fp=response.filename_or_fp,
+                mimetype=self._mimetype or response.mimetype,
+                as_attachment=response.as_attachment,
+                attachment_filename=response.attachment_filename,
+                add_etags=response.add_etags,
+                cache_timeout=response.cache_timeout,
+                conditional=response.conditional,
+                last_modified=response.last_modified,
+            )
+        if not isinstance(response, self._response_class):
+            if is_last_decorator:
+                raise UnexpectedResponseError(type(response))
+            return response  # Let's hope the next RespondsWithDecorator takes care of the response
 
-    def __init__(self, app=None):
-        self.config = deepcopy(self.DEFAULT_CONFIG)
-        self.config.setdefault("definitions", {})
-        self.spec_url = "/swagger.json"
-        self._default_error_handlers = True
-        super().__init__(app, self.config)
+        try:
+            response.validate()
+        except DataError as ex:
+            raise InvalidResponseError(ex.errors) from ex
 
-    def init_app(self, app: Flask, decorators=None) -> None:
+        response = jsonify(response.to_primitive())
+        response.status_code = self._code
+        return response
+
+
+class FlaskAcceptsDecorator(AcceptsDecorator):
+    def _get_request_content_type(self, *args, **kwargs):
+        return request.content_type
+
+    def _get_request_json(self, *args, **kwargs):
+        return request.json
+
+
+class FlaskApistrap(Apistrap):
+    PARAMETER_TYPE_MAP = {int: "integer", str: "string"}
+
+    def __init__(self):
+        super().__init__()
+        self._app: Flask = None
+        self._specs_extracted = False
+
+    def init_app(self, app: Flask):
         """
-        Bind the extension to a Flask app
-        :param app: the Flask app to bind to
-        :param decorators: decorators that should be used to wrap the UI and specification views
+        Bind the extension to a Flask instance.
+
+        :param app: the Flask instance
         """
+        self._app = app
+        blueprint = Blueprint("apistrap", __name__, template_folder=path.join(path.dirname(__file__), "templates"))
+
+        if self.spec_url is not None:
+            blueprint.route(self.spec_url, methods=["GET"])(self._get_spec)
+
+        if self.spec_url is not None and self.ui_url is not None:
+            blueprint.route(self.ui_url)(self._get_ui)
+            blueprint.route(self.ui_url + "/")(self._get_ui)
+
+        app.register_blueprint(blueprint)
+
         if self.use_default_error_handlers:
             app.register_error_handler(HTTPException, self.http_error_handler)
             app.register_error_handler(ApiClientError, self.error_handler)
             app.register_error_handler(ApiServerError, self.internal_error_handler)
             app.register_error_handler(Exception, self.internal_error_handler)
 
-        super().init_app(app, decorators)
+    def _is_bound(self) -> bool:
+        return self._app is not None
+
+    def _get_spec(self):
+        """
+        Serves the OpenAPI specification
+        """
+        self._extract_specs()
+        return jsonify(self.to_openapi_dict())
+
+    _get_spec.apistrap_ignore = True
+
+    def _get_ui(self):
+        """
+        Serves Swagger UI
+        """
+        return render_template("apidocs.html", apistrap=self)
+
+    _get_ui.apistrap_ignore = True
+
+    def _extract_specs(self):
+        """
+        Extract specification data from the Flask app and save it to the underlying Apispec object
+        """
+        if self._specs_extracted:
+            return
+
+        for rule in self._app.url_map.iter_rules():
+            # Skip Flask's internal static endpoint
+            if rule.endpoint == "static":
+                continue
+
+            handler = self._app.view_functions[rule.endpoint]
+
+            # Skip ignored endpoints
+            if getattr(handler, "apistrap_ignore", False):
+                continue
+
+            url = str(rule)
+            for arg in re.findall("(<([^<>]*:)?([^<>]*)>)", url):
+                url = url.replace(arg[0], "{%s}" % arg[2])
+
+            for method in rule.methods:
+                if method.lower() not in ["get", "post", "put", "delete", "patch"]:
+                    continue
+
+                self.spec.path(url, {method.lower(): self._extract_operation_specs(handler)})
+
+        self._specs_extracted = True
+
+    def _extract_operation_specs(self, handler):
+        """
+        Extract operation specification data from a Flask view handler
+
+        :param handler: the Flask handler to extract
+        :return: a dictionary containing the specification data
+        """
+
+        specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
+        specs_dict["summary"] = handler.__doc__.strip() if handler.__doc__ else ""
+
+        signature = inspect.signature(handler)
+        ignored = getattr(handler, "_ignored_params", [])
+
+        for arg in signature.parameters.values():
+            if arg.name not in ignored:
+                param_data = {
+                    "in": "path",
+                    "name": arg.name,
+                    "required": True,
+                    "schema": {"type": self.PARAMETER_TYPE_MAP.get(arg.annotation, "string")},
+                }
+
+                specs_dict["parameters"].append(param_data)
+
+        specs_dict["operationId"] = snake_to_camel(handler.__name__)
+
+        return specs_dict
 
     def http_error_handler(self, exception: HTTPException):
         """
@@ -56,12 +184,9 @@ class Swagger(Flasgger):
         :return: a response object
         """
 
-        if self.app.debug:
+        if self._app.debug:
             logging.exception(exception)
-            error_response = ErrorResponse(dict(
-                message=str(exception),
-                debug_data=format_exception(exception)
-            ))
+            error_response = ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
         else:
             error_response = ErrorResponse(dict(message=str(exception)))
 
@@ -76,144 +201,22 @@ class Swagger(Flasgger):
 
         logging.exception(exception)
 
-        if self.app.debug:
-            error_response = ErrorResponse(dict(
-                message=str(exception),
-                debug_data=format_exception(exception)
-            ))
+        if self._app.debug:
+            error_response = ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
         else:
             error_response = ErrorResponse(dict(message="Internal server error"))
 
         return jsonify(error_response.to_primitive()), 500
 
-    @property
-    def title(self) -> str:
-        """
-        A title of the OpenAPI specification (the name of the API)
-        """
-        return self.config.get("title")
-
-    @title.setter
-    def title(self, title: str):
-        self.config["title"] = title
-
-    @property
-    def description(self) -> str:
-        """
-        A longer description of the API used in the OpenAPI specification
-        """
-        return self.config.get("description")
-
-    @description.setter
-    def description(self, description: str):
-        self.config["description"] = description
-
-    @property
-    def spec_url(self) -> Optional[str]:
-        """
-        The URL where the extension should serve the OpenAPI specification. If it is None, the specification is not
-        served at all.
-        """
-        if len(self.config["specs"]) == 0:
-            return None
-        return self.config["specs"][0]["route"]
-
-    @spec_url.setter
-    def spec_url(self, url: Optional[str]):
-        self._ensure_no_app("You cannot configure the spec_url after binding the extension with Flask")
-
-        if self.spec_url is None:
-            self.config["specs"] = deepcopy(self.DEFAULT_CONFIG["specs"])
-
-        if url is None:
-            self.config["specs"] = []
-            return
-
-        self.config["specs"][0]["route"] = url
-
-    @property
-    def ui_url(self) -> Optional[str]:
-        """
-        The URL where the extension should serve the Swagger UI. If it is None, the UI is not served at all.
-        """
-        if not self.config["swagger_ui"]:
-            return None
-
-        return self.config["specs_route"]
-
-    @ui_url.setter
-    def ui_url(self, value: Optional[str]):
-        self._ensure_no_app("You cannot change the UI url after binding the extension with Flask")
-
-        if value is None:
-            self.config["swagger_ui"] = False
-            return
-
-        self.config["swagger_ui"] = True
-        self.config["specs_route"] = value
-
-    @property
-    def use_default_error_handlers(self) -> bool:
-        """
-        A flag that indicates if the extension should register its error handlers when binding it with the Flask app
-        """
-        return self._default_error_handlers
-
-    @use_default_error_handlers.setter
-    def use_default_error_handlers(self, value: bool):
-        self._ensure_no_app("You cannot change the error handler settings after binding the extension with Flask")
-        self._default_error_handlers = value
-
-    def autodoc(self, *, ignored_args: Sequence[str] = ()):
-        """
-        A decorator that generates Swagger metadata based on the signature of the decorated function and black magic.
-        """
-        return AutodocDecorator(self, ignored_args=ignored_args)
-
-    def responds_with(self, response_class: Type[Model], *, code: int=200, description: Optional[str]=None,
-                      mimetype: Optional[str]=None):
-        """
-        A decorator that fills in response schemas in the Swagger specification. It also converts Schematics models
-        returned by view functions to JSON and validates them.
-        """
-        return RespondsWithDecorator(self, response_class, code=code, description=description, mimetype=mimetype)
+    def responds_with(
+        self,
+        response_class: Type[Model],
+        *,
+        code: int = 200,
+        description: Optional[str] = None,
+        mimetype: Optional[str] = None
+    ):
+        return FlaskRespondsWithDecorator(self, response_class, code=code, description=description, mimetype=mimetype)
 
     def accepts(self, request_class: Type[Model]):
-        """
-        A decorator that validates request bodies against a schema and passes it as an argument to the view function.
-        The destination argument must be annotated with the request type.
-        """
-        return AcceptsDecorator(self, request_class)
-
-    def tags(self, *tags: str):
-        """
-        A decorator that adds tags to the OpenAPI specification of the decorated view function.
-        """
-        return TagsDecorator(tags)
-
-    def add_definition(self, name: str, schema: dict) -> str:
-        """
-        Add a new definition to the specification. If a different schema is supplied for an existing definition, a
-        ValueError is raised.
-        :param name: the name of the definition (without the '#/definitions/' part)
-        :param schema: a JsonObject OpenAPI structure
-        :return: the full path to the definition in the specification file (can be used directly with $ref)
-        """
-
-        definition_name = "#/definitions/{}".format(name)
-
-        if name in self.config["definitions"]:
-            if self.config["definitions"][name] != schema:
-                raise ValueError("Conflicting definitions of `{}`".format(definition_name))
-        else:
-            self.config["definitions"][name] = schema
-
-        return definition_name
-
-    def _ensure_no_app(self, message):
-        """
-        Raise an error if the extension was already bound to a Flask app
-        :param message: the message of the exception
-        """
-        if hasattr(self, "app") and self.app is not None:
-            raise SwaggerExtensionError(message)
+        return FlaskAcceptsDecorator(self, request_class)

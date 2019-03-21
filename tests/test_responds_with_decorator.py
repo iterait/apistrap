@@ -1,11 +1,12 @@
 import io
+
 import pytest
 from schematics import Model
 from schematics.types import StringType
 
-from apistrap.errors import UnexpectedResponseError, InvalidResponseError
-from apistrap.types import FileResponse
+from apistrap.errors import InvalidResponseError, UnexpectedResponseError
 from apistrap.schemas import EmptyResponse
+from apistrap.types import FileResponse
 
 
 def extract_definition_name(definition_spec: str):
@@ -25,44 +26,38 @@ class ErrorResponse(Model):
 
 
 @pytest.fixture()
-def app_with_responds_with(app, swagger):
+def app_with_responds_with(app, flask_apistrap):
     @app.route("/")
-    @swagger.autodoc()
-    @swagger.responds_with(OkResponse)
-    @swagger.responds_with(ErrorResponse, code=400)
+    @flask_apistrap.responds_with(OkResponse)
+    @flask_apistrap.responds_with(ErrorResponse, code=400)
     def view():
         return OkResponse(dict(string_field="Hello World"))
 
     @app.route("/description")
-    @swagger.autodoc()
-    @swagger.responds_with(OkResponse, description='my description')
+    @flask_apistrap.responds_with(OkResponse, description='my description')
     def descriptive_view():
         return OkResponse(dict(string_field="Hello descriptive World"))
 
     @app.route("/error")
-    @swagger.autodoc()
-    @swagger.responds_with(OkResponse)
-    @swagger.responds_with(ErrorResponse, code=400)
+    @flask_apistrap.responds_with(OkResponse)
+    @flask_apistrap.responds_with(ErrorResponse, code=400)
     def error_view():
         return ErrorResponse(dict(error_message="Error"))
 
     @app.route("/weird")
-    @swagger.autodoc()
-    @swagger.responds_with(OkResponse)
-    @swagger.responds_with(ErrorResponse, code=400)
+    @flask_apistrap.responds_with(OkResponse)
+    @flask_apistrap.responds_with(ErrorResponse, code=400)
     def weird_view():
         return WeirdResponse(dict(string_field="Hello World"))
 
     @app.route("/invalid")
-    @swagger.autodoc()
-    @swagger.responds_with(OkResponse)
-    @swagger.responds_with(ErrorResponse, code=400)
+    @flask_apistrap.responds_with(OkResponse)
+    @flask_apistrap.responds_with(ErrorResponse, code=400)
     def invalid_view():
         return OkResponse(dict())
 
     @app.route("/file")
-    @swagger.autodoc()
-    @swagger.responds_with(FileResponse)
+    @flask_apistrap.responds_with(FileResponse)
     def get_file():
         message = 'hello'
         return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
@@ -70,24 +65,24 @@ def app_with_responds_with(app, swagger):
                             attachment_filename='hello.txt')
 
     @app.route("/empty")
-    @swagger.autodoc()
-    @swagger.responds_with(EmptyResponse)
+    @flask_apistrap.responds_with(EmptyResponse)
     def get_empty_response():
         return EmptyResponse()
 
 
-def test_responses_in_swagger_json(app_with_responds_with, client):
-    response = client.get("/swagger.json")
+def test_responses_in_spec_json(app_with_responds_with, client):
+    response = client.get("/spec.json")
 
-    assert "definitions" in response.json
+    assert "components" in response.json
+    assert "responses" in response.json["components"]
 
     # test ok response
     assert "200" in response.json["paths"]["/"]["get"]["responses"]
-    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["200"]
-    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["200"]["schema"]
-    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["200"]["schema"]["$ref"])
+    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]
+    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"])
 
-    assert response.json["definitions"][ref] == {
+    assert response.json["components"]["schemas"][ref] == {
         "title": "OkResponse",
         "type": "object",
         "properties": {
@@ -106,11 +101,11 @@ def test_responses_in_swagger_json(app_with_responds_with, client):
 
     # test error response
     assert "400" in response.json["paths"]["/"]["get"]["responses"]
-    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["400"]
-    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["400"]["schema"]
-    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["400"]["schema"]["$ref"])
+    assert "schema" in response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]
+    assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]["schema"]
+    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]["schema"]["$ref"])
 
-    assert response.json["definitions"][ref] == {
+    assert response.json["components"]["schemas"][ref] == {
         "title": "ErrorResponse",
         "type": "object",
         "properties": {

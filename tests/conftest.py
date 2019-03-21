@@ -2,8 +2,8 @@ import pytest
 from flask import Flask
 from pytest_mock import MockFixture
 
-from apistrap.flask import Swagger
 from apistrap.aiohttp import AioHTTPApistrap
+from apistrap.flask import FlaskApistrap
 
 
 @pytest.fixture(scope='function')
@@ -19,8 +19,10 @@ def app():
 
 
 @pytest.fixture(scope='function')
-def swagger(app):
-    yield Swagger(app)
+def flask_apistrap(app):
+    apistrap = FlaskApistrap()
+    apistrap.init_app(app)
+    yield apistrap
 
 
 @pytest.fixture()

@@ -1,11 +1,10 @@
-import pytest
-
 import numpy as np
+import pytest
 from schematics import Model
 from schematics.exceptions import DataError, ValidationError
-from schematics.types import IntType, ModelType, StringType, FloatType
+from schematics.types import FloatType, IntType, ModelType, StringType
 
-from apistrap.types import TupleType, NonNanFloatType
+from apistrap.types import NonNanFloatType, TupleType
 
 
 class Inner(Model):
