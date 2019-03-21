@@ -5,15 +5,13 @@ from copy import deepcopy
 from os import path
 from typing import Optional, Type
 
-from flask import (Blueprint, Flask, Response, jsonify, render_template,
-                   request, send_file)
+from flask import Blueprint, Flask, Response, jsonify, render_template, request, send_file
 from schematics import Model
 from schematics.exceptions import DataError
 from werkzeug.exceptions import HTTPException
 
 from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator
-from apistrap.errors import (ApiClientError, ApiServerError,
-                             InvalidResponseError, UnexpectedResponseError)
+from apistrap.errors import ApiClientError, ApiServerError, InvalidResponseError, UnexpectedResponseError
 from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
@@ -68,7 +66,8 @@ class FlaskApistrap(Apistrap):
 
     def init_app(self, app: Flask):
         """
-        Bind the extension to a Flask instance
+        Bind the extension to a Flask instance.
+
         :param app: the Flask instance
         """
         self._app = app
@@ -142,7 +141,7 @@ class FlaskApistrap(Apistrap):
     def _extract_operation_specs(self, handler):
         """
         Extract operation specification data from a Flask view handler
-        
+
         :param handler: the Flask handler to extract
         :return: a dictionary containing the specification data
         """

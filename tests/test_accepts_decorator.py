@@ -28,8 +28,8 @@ def app_with_accepts(app, flask_apistrap):
         return jsonify()
 
 
-def test_parameters_in_swagger_json(app_with_accepts, client):
-    response = client.get("/swagger.json")
+def test_parameters_in_spec_json(app_with_accepts, client):
+    response = client.get("/spec.json")
 
     assert "components" in response.json
     assert "schemas" in response.json["components"]
@@ -110,7 +110,7 @@ def app_with_arg(app, flask_apistrap):
 
 
 def test_correct_parameters(app_with_arg, client: Client):
-    response = client.get("/swagger.json")
+    response = client.get("/spec.json")
     path = response.json["paths"]["/{arg}"]["post"]
 
     assert len(path["parameters"]) == 1

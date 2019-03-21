@@ -70,8 +70,8 @@ def app_with_responds_with(app, flask_apistrap):
         return EmptyResponse()
 
 
-def test_responses_in_swagger_json(app_with_responds_with, client):
-    response = client.get("/swagger.json")
+def test_responses_in_spec_json(app_with_responds_with, client):
+    response = client.get("/spec.json")
 
     assert "components" in response.json
     assert "responses" in response.json["components"]

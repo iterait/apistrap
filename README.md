@@ -27,8 +27,7 @@ oapi.title = "Some title for your API"
 oapi.description = "A description of the API"
 ```
 
-You will probably want to put this to a separate module so that you can import it in your blueprint files. In this case,
-you can omit the `app` argument and call `Swagger.init_app(app)` later when you create the Flask app.
+You will probably want to put this into a separate module so that you can import it in your blueprint files.
 
 **Important**: A big part of the functionality is exposed using decorators on Flask view functions. Make sure that the 
 Flask `route()` decorator is always the last applied one (the one on the top). Otherwise, the HTTP handler might not 
@@ -123,14 +122,14 @@ response object is encountered, an error (code 500) is returned.
 
 ### Working with the Specification File
 
-You can obtain the OpenAPI specification through `http://yourapi.tld/swagger.json`. This file can be used by 
+You can obtain the OpenAPI specification through `http://yourapi.tld/spec.json`. This file can be used by 
 Swagger-related utilities. The specification file can be put under a different URL with 
-`swagger.spec_url = '/anything.json'`. By setting `swagger.spec_url` to `None`, you can effectively hide the 
+`oapi.spec_url = '/anything.json'`. By setting `oapi.spec_url` to `None`, you can effectively hide the 
 specification.
 
 The extension also serves the Swagger UI automatically. You can browse it on `http://yourapi.tld/apidocs/`. You can 
-change the URL of the UI with `swagger.ui_url = "/docs_url/`. This feature can be turned off completely with 
-`swagger.ui_url = None`.
+change the URL of the UI with `oapi.ui_url = "/docs_url/`. This feature can be turned off completely with 
+`oapi.ui_url = None`.
 
 ### Organizing Endpoints Using Tags
 

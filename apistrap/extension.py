@@ -6,9 +6,8 @@ from apispec import APISpec
 from apispec.utils import OpenAPIVersion
 from schematics import Model
 
-from apistrap.decorators import (IgnoreDecorator, IgnoreParamsDecorator,
-                                 SecurityDecorator, TagsDecorator)
-from apistrap.errors import SwaggerExtensionError
+from apistrap.decorators import IgnoreDecorator, IgnoreParamsDecorator, SecurityDecorator, TagsDecorator
+from apistrap.errors import ApistrapExtensionError
 
 
 class SecurityScheme(metaclass=ABCMeta):
@@ -92,7 +91,7 @@ class Apistrap(metaclass=ABCMeta):
         self.oauth_client_id = None
         self.oauth_client_secret = None
         self.security_schemes: List[SecurityScheme] = []
-        self._spec_url = "/swagger.json"
+        self._spec_url = "/spec.json"
         self._ui_url = "/apidocs"
         self._use_default_error_handlers = True
 
@@ -114,13 +113,14 @@ class Apistrap(metaclass=ABCMeta):
         Check whether the extension is bound to an app.
         """
 
-    def _ensure_not_bound(self, message: str):
+    def _ensure_not_bound(self, message: str) -> None:
         """
         Throw an exception if the extension is already bound
+
         :param message: the message of the exception
         """
         if self._is_bound():
-            raise SwaggerExtensionError(message)
+            raise ApistrapExtensionError(message)
 
     @property
     def title(self) -> str:
@@ -175,12 +175,13 @@ class Apistrap(metaclass=ABCMeta):
         """
         Add a new request definition to the specification. If a different schema is supplied for an existing definition,
         a ValueError is raised.
+
         :param name: the name of the definition (without the '#/components/.../' part)
         :param schema: a JsonObject OpenAPI structure
         :return: the full path to the definition in the specification file (can be used directly with $ref)
         """
 
-        components = self.spec.components.to_openapi_dict()
+        components = self.spec.components.to_dict()
         if name in components["schemas"]:
             if components["schemas"][name] != schema:
                 raise ValueError("Conflicting definitions of `{}`".format(name))
@@ -193,12 +194,13 @@ class Apistrap(metaclass=ABCMeta):
         """
         Add a new response definition to the specification. If a different schema is supplied for an existing definition,
         a ValueError is raised.
+
         :param name: the name of the definition (without the '#/components/.../' part)
         :param schema: a JsonObject OpenAPI structure
         :return: the full path to the definition in the specification file (can be used directly with $ref)
         """
 
-        components = self.spec.components.to_openapi_dict()
+        components = self.spec.components.to_dict()
         if name in components["responses"]:
             if components["responses"][name] != schema:
                 raise ValueError("Conflicting definitions of `{}`".format(name))
@@ -211,12 +213,13 @@ class Apistrap(metaclass=ABCMeta):
         """
         Add a new schema definition to the specification. If a different schema is supplied for an existing definition,
         a ValueError is raised.
+
         :param name: the name of the definition (without the '#/components/.../' part)
         :param schema: a JsonObject OpenAPI structure
         :return: the full path to the definition in the specification file (can be used directly with $ref)
         """
 
-        components = self.spec.components.to_openapi_dict()
+        components = self.spec.components.to_dict()
         if name in components["schemas"]:
             if components["schemas"][name] != schema:
                 raise ValueError("Conflicting definitions of `{}`".format(name))
@@ -228,6 +231,7 @@ class Apistrap(metaclass=ABCMeta):
     def add_security_scheme(self, scheme: SecurityScheme):
         """
         Add a security scheme to be used by the API.
+
         :param scheme: a description of the security scheme
         """
 

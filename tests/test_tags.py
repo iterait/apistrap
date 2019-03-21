@@ -11,7 +11,7 @@ def app_with_tags(app, flask_apistrap):
 
 
 def test_simple_tags(app_with_tags, client):
-    response = client.get("/swagger.json")
+    response = client.get("/spec.json")
     path = response.json["paths"]["/"]["get"]
 
     assert "tags" in path
@@ -28,7 +28,7 @@ def app_with_repeated_tags(app, flask_apistrap):
 
 
 def test_repeated_tags(app_with_repeated_tags, client):
-    response = client.get("/swagger.json")
+    response = client.get("/spec.json")
     path = response.json["paths"]["/"]["get"]
 
     assert "tags" in path

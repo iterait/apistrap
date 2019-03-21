@@ -13,14 +13,12 @@ from aiohttp import web
 from aiohttp.web_exceptions import HTTPError
 from aiohttp.web_request import BaseRequest, Request
 from aiohttp.web_response import Response
-from aiohttp.web_urldispatcher import (AbstractRoute, DynamicResource,
-                                       PlainResource)
+from aiohttp.web_urldispatcher import AbstractRoute, DynamicResource, PlainResource
 from schematics import Model
 from schematics.exceptions import DataError
 
 from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator
-from apistrap.errors import (ApiClientError, InvalidResponseError,
-                             UnexpectedResponseError)
+from apistrap.errors import ApiClientError, InvalidResponseError, UnexpectedResponseError
 from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
@@ -206,7 +204,13 @@ class AioHTTPApistrap(Apistrap):
             loader=jinja2.FileSystemLoader(path.join(path.dirname(__file__), "templates"))
         )
 
-    def init_app(self, app: web.Application):
+    def init_app(self, app: web.Application) -> None:
+        """
+        Bind the extension to an AioHTTP instance.
+
+        :param app: the AioHTTP instance
+        """
+
         self.app = app
         app.middlewares.append(self.error_middleware)
 
@@ -218,8 +222,11 @@ class AioHTTPApistrap(Apistrap):
                     app.router.add_route("get", ui_url, self._get_ui)
 
     def _get_spec(self, request: Request):
-        self._extract_specs()
+        """
+        Serves the OpenAPI specification
+        """
 
+        self._extract_specs()
         return web.Response(text=json.dumps(self.to_openapi_dict()), content_type="application/json", status=200)
 
     _get_spec.apistrap_ignore = True
@@ -237,7 +244,12 @@ class AioHTTPApistrap(Apistrap):
 
     _get_ui.apistrap_ignore = True
 
-    def _extract_specs(self):
+    def _extract_specs(self) -> None:
+        """
+        Extract the specification data from the bound AioHTTP app. If the data was already extracted, do not do
+        anything.
+        """
+
         if self._specs_extracted:
             return
 
@@ -260,7 +272,14 @@ class AioHTTPApistrap(Apistrap):
 
         self._specs_extracted = True
 
-    def _extract_operation_spec(self, route: AbstractRoute):
+    def _extract_operation_spec(self, route: AbstractRoute) -> dict:
+        """
+        Extract specification data for a single operation.
+
+        :param route: the route for the operation
+        :return: a dict with specification data
+        """
+
         specs_dict = deepcopy(getattr(route.handler, "specs_dict", {"parameters": [], "responses": {}}))
         specs_dict["summary"] = route.handler.__doc__.strip() if route.handler.__doc__ else ""
 
@@ -293,7 +312,7 @@ class AioHTTPApistrap(Apistrap):
         mimetype: Optional[str] = None,
     ):
         """
-        A decorator that fills in response schemas in the Swagger specification. It also converts Schematics models
+        A decorator that fills in response schemas in the OpenAPI specification. It also converts Schematics models
         returned by view functions to JSON and validates them.
         """
         return AioHTTPRespondsWithDecorator(self, response_class, code=code, description=description, mimetype=mimetype)

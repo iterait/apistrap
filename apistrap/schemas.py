@@ -17,5 +17,3 @@ class EmptyResponse(Model):
     """
     An empty message wrapper
     """
-
-    pass

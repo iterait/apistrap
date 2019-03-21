@@ -15,16 +15,16 @@ class Response(Model):
 
 
 decorators = [
-    lambda swagger: swagger.responds_with(Response, code=201),
-    lambda swagger: swagger.accepts(Request),
-    lambda swagger: swagger.tags("Tag 1", "Tag 2")
+    lambda oapi: oapi.responds_with(Response, code=201),
+    lambda oapi: oapi.accepts(Request),
+    lambda oapi: oapi.tags("Tag 1", "Tag 2")
 ]
 
 
 @pytest.fixture(params=list(itertools.permutations(decorators)))
 def decorated_app(app, flask_apistrap, request):
     """
-    An app fixture parametrized with all possible orders of different kinds of swagger decorators
+    An app fixture parametrized with all possible orders of different kinds of Apistrap decorators
     """
 
     # Prepare a bare view function body
@@ -40,7 +40,7 @@ def decorated_app(app, flask_apistrap, request):
 
 
 def test_decorator_order(decorated_app, client):
-    response = client.get("/swagger.json")
+    response = client.get("/spec.json")
     path = response.json["paths"]["/{path_arg}"]["get"]
 
     assert len(path["parameters"]) == 1

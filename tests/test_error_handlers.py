@@ -73,9 +73,9 @@ def test_internal_server_error_handler_in_production(app_with_errors, client, ap
 
 @pytest.fixture()
 def app_with_errors_and_no_error_handlers(app):
-    swagger = FlaskApistrap()
-    swagger.use_default_error_handlers = False
-    swagger.init_app(app)
+    oapi = FlaskApistrap()
+    oapi.use_default_error_handlers = False
+    oapi.init_app(app)
 
     @app.route("/internal_error")
     def view():

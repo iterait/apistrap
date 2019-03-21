@@ -25,7 +25,7 @@ def app_with_accepts(app, flask_apistrap):
 
 
 def test_int_subtype(client, app_with_accepts):
-    spec = client.get("/swagger.json").json
+    spec = client.get("/spec.json").json
     path = spec["paths"]["/"]["post"]
     body = path["requestBody"]
     assert body is not None

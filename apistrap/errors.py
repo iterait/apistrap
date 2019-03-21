@@ -1,9 +1,9 @@
 from typing import Dict, List
 
 
-class SwaggerExtensionError(Exception):
+class ApistrapExtensionError(Exception):
     """
-    Raised on incorrect usage of the Swagger extension
+    Raised on incorrect usage of the Apistrap extension
     """
 
 

@@ -23,18 +23,18 @@ def test_ui_accessible_1(app_basic, client):
     assert response.status_code == 200
 
 
-def test_swagger_json_accessible(app_basic, client):
-    response = client.get("/swagger.json")
+def test_spec_json_accessible(app_basic, client):
+    response = client.get("/spec.json")
     assert response.status_code == 200
 
 
-def test_endpoint_present_in_swagger_json(app_basic, client):
-    response = client.get("/swagger.json")
+def test_endpoint_present_in_spec_json(app_basic, client):
+    response = client.get("/spec.json")
     assert "/" in response.json["paths"].keys()
 
 
-def test_path_params_present_in_swagger_json(app_basic, client):
-    response = client.get("/swagger.json")
+def test_path_params_present_in_spec_json(app_basic, client):
+    response = client.get("/spec.json")
     path = "/view/{param}/{typed_param}"
 
     assert path in response.json["paths"].keys()
@@ -57,8 +57,8 @@ def test_path_params_present_in_swagger_json(app_basic, client):
     ]
 
 
-def test_operation_id_present_in_swagger_json(app_basic, client):
-    response = client.get("/swagger.json")
+def test_operation_id_present_in_spec_json(app_basic, client):
+    response = client.get("/spec.json")
     path = "/view/{param}/{typed_param}"
     assert path in response.json["paths"].keys()
     assert response.json["paths"][path]["get"]["operationId"] == "viewWithParams"

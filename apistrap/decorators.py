@@ -6,7 +6,7 @@ from typing import Callable, Optional, Sequence, Type
 from schematics import Model
 from schematics.exceptions import DataError
 
-from apistrap.errors import (ApiClientError, InvalidFieldsError)
+from apistrap.errors import ApiClientError, InvalidFieldsError
 from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.types import FileResponse
 
@@ -37,6 +37,10 @@ def _get_wrapped_function(func: Callable):
 
 
 class IgnoreParamsDecorator:
+    """
+    A decorator that marks specified function parameters as ignored for the purposes of generating a specification
+    """
+
     def __init__(self, ignored_params: Sequence[str]):
         self._ignored_params = ignored_params
 
@@ -59,7 +63,7 @@ class RespondsWithDecorator:
 
     def __init__(
         self,
-        swagger: "apistrap.extension.Apistrap",
+        apistrap: "apistrap.extension.Apistrap",
         response_class: Type[Model],
         *,
         code: int = 200,
@@ -68,7 +72,7 @@ class RespondsWithDecorator:
     ):
         self._response_class = response_class
         self._code = code
-        self._swagger = swagger
+        self._apistrap = apistrap
         self._description = description or self._response_class.__name__
         self._mimetype = mimetype
 
@@ -88,7 +92,7 @@ class RespondsWithDecorator:
                 "content": {
                     "application/json": {
                         "schema": {
-                            "$ref": self._swagger.add_schema_definition(
+                            "$ref": self._apistrap.add_schema_definition(
                                 self._response_class.__name__, self._get_schema_object()
                             )
                         }
@@ -134,8 +138,8 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
     The destination argument must be annotated with the request type.
     """
 
-    def __init__(self, swagger: "apistrap.extension.Apistrap", request_class: Type[Model]):
-        self._swagger = swagger
+    def __init__(self, apistrap: "apistrap.extension.Apistrap", request_class: Type[Model]):
+        self._apistrap = apistrap
         self._request_class = request_class
 
     def __call__(self, wrapped_func: Callable):
@@ -146,7 +150,7 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
             "content": {
                 "application/json": {
                     "schema": {
-                        "$ref": self._swagger.add_request_definition(
+                        "$ref": self._apistrap.add_request_definition(
                             self._request_class.__name__, schematics_model_to_schema_object(self._request_class)
                         )
                     }

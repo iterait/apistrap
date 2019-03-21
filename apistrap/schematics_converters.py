@@ -2,9 +2,16 @@ from inspect import getmro
 from typing import Any, Dict, Generator, Type
 
 from schematics import Model
-from schematics.types.base import (BaseType, BooleanType, DecimalType,
-                                   FloatType, IntType, LongType, NumberType,
-                                   StringType)
+from schematics.types.base import (
+    BaseType,
+    BooleanType,
+    DecimalType,
+    FloatType,
+    IntType,
+    LongType,
+    NumberType,
+    StringType,
+)
 from schematics.types.compound import DictType, ListType, ModelType
 
 
@@ -143,6 +150,7 @@ def _model_dict_to_schema_object(model: Type[Model]) -> Dict[str, Any]:
 def _primitive_array_to_schema_object(field: BaseType) -> Dict[str, Any]:
     """
     Get a SchemaObject for a list of primitive types
+
     :param field: the field that determines the value type
     :return: a SchemaObject
     """
