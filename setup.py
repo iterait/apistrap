@@ -19,7 +19,9 @@ setup(name='apistrap',
       author_email='hello@iterait.com',
       license='MIT',
       packages=find_packages('.', exclude='tests'),
-      include_package_data=True,
+      package_data={
+          'apistrap': ['templates/*.html']
+      },
       zip_safe=False,
       setup_requires=['pytest-runner'],
       tests_require=['pytest', 'pytest-mock', 'pytest-flask', 'pytest-aiohttp'],
