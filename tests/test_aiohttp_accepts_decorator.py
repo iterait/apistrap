@@ -1,9 +1,10 @@
 import json
+
 import pytest
 from aiohttp import web
 from aiohttp.web_request import BaseRequest
 from schematics import Model
-from schematics.types import StringType, IntType
+from schematics.types import IntType, StringType
 
 
 class RequestModel(Model):

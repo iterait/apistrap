@@ -1,6 +1,7 @@
+from typing import Any, Mapping
+
 from schematics import Model
-from schematics.types import StringType, DictType, BaseType
-from typing import Mapping, Any
+from schematics.types import BaseType, DictType, StringType
 
 
 class ErrorResponse(Model):
@@ -16,4 +17,3 @@ class EmptyResponse(Model):
     """
     An empty message wrapper
     """
-    pass

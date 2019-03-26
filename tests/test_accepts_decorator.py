@@ -3,7 +3,7 @@ import json
 import pytest
 from flask import jsonify
 from schematics import Model
-from schematics.types import StringType, IntType
+from schematics.types import IntType, StringType
 from werkzeug.test import Client
 
 from apistrap.errors import ApiClientError, InvalidFieldsError
@@ -19,30 +19,30 @@ class Request(Model):
 
 
 @pytest.fixture()
-def app_with_accepts(app, swagger):
+def app_with_accepts(app, flask_apistrap):
     @app.route("/", methods=["POST"])
-    @swagger.autodoc()
-    @swagger.accepts(Request)
+    @flask_apistrap.accepts(Request)
     def view(req: Request):
         assert req.string_field == "foo"
         assert req.int_field == 42
         return jsonify()
 
 
-def test_parameters_in_swagger_json(app_with_accepts, client):
-    response = client.get("/swagger.json")
+def test_parameters_in_spec_json(app_with_accepts, client):
+    response = client.get("/spec.json")
 
-    assert "definitions" in response.json
+    assert "components" in response.json
+    assert "schemas" in response.json["components"]
 
     path = response.json["paths"]["/"]["post"]
     assert "parameters" in path
 
-    body = next(filter(lambda item: item["in"] == "body", path["parameters"]), None)
+    body = path["requestBody"]
     assert body is not None
     assert body["required"] is True
 
-    ref = extract_definition_name(body["schema"]["$ref"])
-    assert response.json["definitions"][ref] == {
+    ref = extract_definition_name(body["content"]["application/json"]["schema"]["$ref"])
+    assert response.json["components"]["schemas"][ref] == {
         "title": Request.__name__,
         "type": "object",
         "properties": {
@@ -100,10 +100,9 @@ def test_invalid_field(app_with_accepts, client: Client, propagate_exceptions):
 
 
 @pytest.fixture()
-def app_with_arg(app, swagger):
+def app_with_arg(app, flask_apistrap):
     @app.route("/<arg>", methods=["POST"])
-    @swagger.autodoc()
-    @swagger.accepts(Request)
+    @flask_apistrap.accepts(Request)
     def view(arg, req: Request):
         assert req.string_field == "foo"
         assert req.int_field == 42
@@ -111,14 +110,16 @@ def app_with_arg(app, swagger):
 
 
 def test_correct_parameters(app_with_arg, client: Client):
-    response = client.get("/swagger.json")
+    response = client.get("/spec.json")
     path = response.json["paths"]["/{arg}"]["post"]
-    assert len(path["parameters"]) == 2
-    assert next(filter(lambda item: item["in"] == "body", path["parameters"]), None) is not None
-    assert next(filter(lambda item: item["in"] == "path", path["parameters"]), None) is not None
+
+    assert len(path["parameters"]) == 1
+    assert path["parameters"][0]["in"] == "path"
+
+    assert path["requestBody"] is not None
 
 
-def test_no_injection_parameter(app, swagger):
+def test_no_injection_parameter(app, flask_apistrap):
     """
     If the `accepts` decorator is applied to a function that has no parameter with a type annotation corresponding to
     the request type, an exception should be thrown.
@@ -128,4 +129,4 @@ def test_no_injection_parameter(app, swagger):
         return jsonify()
 
     with pytest.raises(TypeError):
-        swagger.accepts(Request)(view)
+        flask_apistrap.accepts(Request)(view)

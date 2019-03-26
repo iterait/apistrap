@@ -1,14 +1,15 @@
 import contextlib
 import io
+import json
+from unittest import mock
+
 import pytest
 from aiohttp import web
 from schematics import Model
-from schematics.types import StringType, IntType
-from unittest import mock
-import json
+from schematics.types import IntType, StringType
 
 from apistrap.aiohttp import ErrorHandlerMiddleware
-from apistrap.errors import UnexpectedResponseError, InvalidResponseError
+from apistrap.errors import InvalidResponseError, UnexpectedResponseError
 from apistrap.types import FileResponse
 
 

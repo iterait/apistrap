@@ -1,7 +1,7 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(name='apistrap',
-      version='0.2.0',
+      version='0.3.0',
       description='Iterait REST API utilities',
       classifiers=[
           'Development Status :: 4 - Beta',
@@ -23,7 +23,7 @@ setup(name='apistrap',
       zip_safe=False,
       setup_requires=['pytest-runner'],
       tests_require=['pytest', 'pytest-mock', 'pytest-flask', 'pytest-aiohttp'],
-      install_requires=['flasgger', 'schematics', 'more_itertools'],
+      install_requires=['apispec', 'schematics', 'more_itertools'],
       extras_require={
           'flask': ['flask'],
           'aiohttp': ['aiohttp']

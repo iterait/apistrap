@@ -5,7 +5,7 @@ from typing.io import BinaryIO
 
 import numpy as np
 from schematics.exceptions import BaseError, CompoundError, ValidationError
-from schematics.types import ListType, FloatType
+from schematics.types import FloatType, ListType
 
 
 class FileResponse:
@@ -13,9 +13,18 @@ class FileResponse:
     File response used instead of `flask.send_file`.
     Note that MIME type should preferably be handled by `responds_with` decorator.
     """
-    def __init__(self, filename_or_fp: Union[str, BinaryIO, BytesIO], as_attachment: bool=False,
-                 attachment_filename: str=None, add_etags: bool=True, cache_timeout: int=None, conditional: bool=False,
-                 last_modified: Union[datetime, int]=None, mimetype=None):
+
+    def __init__(
+        self,
+        filename_or_fp: Union[str, BinaryIO, BytesIO],
+        as_attachment: bool = False,
+        attachment_filename: str = None,
+        add_etags: bool = True,
+        cache_timeout: int = None,
+        conditional: bool = False,
+        last_modified: Union[datetime, int] = None,
+        mimetype=None,
+    ):
         self.filename_or_fp = filename_or_fp
         self.as_attachment = as_attachment
         self.attachment_filename = attachment_filename
@@ -45,7 +54,7 @@ class TupleType(ListType):
         super().__init__(field, min_size=length, max_size=length, **kwargs)
 
     def _repr_info(self):
-        return f'TupleType({self.field.__class__.__name__}, {self.max_size})'
+        return f"TupleType({self.field.__class__.__name__}, {self.max_size})"
 
     def _mock(self, context=None):
         return tuple([self.field._mock(context) for _ in range(self.max_size)])
@@ -82,13 +91,13 @@ class NonNanFloatType(FloatType):
 
     _NOT_SET_VALUE = object()
 
-    def __init__(self, default_value: Union[float, object]=_NOT_SET_VALUE, **kwargs):
+    def __init__(self, default_value: Union[float, object] = _NOT_SET_VALUE, **kwargs):
         self._default_value = default_value
         super().__init__(**kwargs)
 
     def to_native(self, value, context=None):
         if np.isreal(value) and np.isscalar(value) and np.isnan(value):  # detect NaN
             if self._default_value == NonNanFloatType._NOT_SET_VALUE:  # user hasn't set the default value
-                raise ValidationError('The value is NaN')
+                raise ValidationError("The value is NaN")
             value = self._default_value
         return super().to_native(value, context)
