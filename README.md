@@ -19,7 +19,7 @@ First, you need to initialize the extension and bind it to your app.
 
 ```python
 from flask import Flask
-from apistrap import FlaskApistrap
+from apistrap.flask import FlaskApistrap
 app = Flask(__name__)
 oapi = FlaskApistrap()
 oapi.init_app(app)
@@ -66,7 +66,7 @@ the same with AioHTTP web routes. Also, you still have to put the route decorato
 from schematics import Model
 from schematics.types import StringType
 from flask import Flask, jsonify
-from apistrap import FlaskApistrap
+from apistrap.flask import FlaskApistrap
 
 app = Flask(__name__)
 oapi = FlaskApistrap()
@@ -97,7 +97,7 @@ Note that the doc block will be parsed and used in the API specification as a de
 from schematics import Model
 from schematics.types import StringType
 from flask import Flask
-from apistrap import FlaskApistrap
+from apistrap.flask import FlaskApistrap
 
 app = Flask(__name__)
 oapi = FlaskApistrap()
@@ -135,7 +135,7 @@ change the URL of the UI with `oapi.ui_url = "/docs_url/`. This feature can be t
 
 ```python
 from flask import Flask, jsonify
-from apistrap import FlaskApistrap
+from apistrap.flask import FlaskApistrap
 
 app = Flask(__name__)
 oapi = FlaskApistrap()
