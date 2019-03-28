@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 setup(name='apistrap',
-      version='0.3.0',
+      version='0.3.1',
       description='Iterait REST API utilities',
       classifiers=[
           'Development Status :: 4 - Beta',
@@ -19,7 +19,9 @@ setup(name='apistrap',
       author_email='hello@iterait.com',
       license='MIT',
       packages=find_packages('.', exclude='tests'),
-      include_package_data=True,
+      package_data={
+          'apistrap': ['templates/*.html']
+      },
       zip_safe=False,
       setup_requires=['pytest-runner'],
       tests_require=['pytest', 'pytest-mock', 'pytest-flask', 'pytest-aiohttp'],
