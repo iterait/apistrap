@@ -35,16 +35,7 @@ async def test_aiohttp_spec_url(aiohttp_client):
     assert oapi.spec_url == "/myspecurl.json"
 
     app = web.Application()
-    routes = web.RouteTableDef()
     oapi.init_app(app)
-
-    @routes.get('/')
-    async def view(request):
-        return web.Response(content_type="application/json", text=json.dumps({
-            "status": "OK"
-        }))
-
-    app.add_routes(routes)
 
     client = await aiohttp_client(app)
     response = await client.get("/myspecurl.json")
@@ -65,16 +56,7 @@ async def test_aiohttp_spec_url_reset(aiohttp_client):
     assert oapi.spec_url == "/myspecurl.json"
 
     app = web.Application()
-    routes = web.RouteTableDef()
     oapi.init_app(app)
-
-    @routes.get('/')
-    async def view(request):
-        return web.Response(content_type="application/json", text=json.dumps({
-            "status": "OK"
-        }))
-
-    app.add_routes(routes)
 
     client = await aiohttp_client(app)
     response = await client.get("/myspecurl.json")
@@ -100,16 +82,7 @@ async def test_aiohttp_disable_spec_url(aiohttp_client):
     assert oapi.spec_url is None
 
     app = web.Application()
-    routes = web.RouteTableDef()
     oapi.init_app(app)
-
-    @routes.get('/')
-    async def view(request):
-        return web.Response(content_type="application/json", text=json.dumps({
-            "status": "OK"
-        }))
-
-    app.add_routes(routes)
 
     client = await aiohttp_client(app)
     response = await client.get("/spec.json")
@@ -149,4 +122,6 @@ async def test_aiohttp_set_ui_url(aiohttp_client):
 
     client = await aiohttp_client(app)
     response = await client.get("/docs/")
+    assert response.status == 200
+    response = await client.get("/docs")
     assert response.status == 200

@@ -7,24 +7,21 @@ from apistrap.flask import FlaskApistrap
 def test_spec_url_repeated_call(app, client):
     oapi = FlaskApistrap()
 
-    oapi.spec_url = "/myspecurl.json"
-    assert oapi.spec_url == "/myspecurl.json"
-
     oapi.init_app(app)
 
     @app.route("/")
     def view():
         return jsonify()
 
-    response = client.get("/myspecurl.json")
+    response = client.get("/spec.json")
     assert response.status_code == 200
-    assert 'paths' in response.json
-    assert '/' in response.json['paths']
+    data = response.json
+    assert 'paths' in data
+    assert '/' in data['paths']
 
-    response = client.get("/myspecurl.json")
+    response = client.get("/spec.json")
     assert response.status_code == 200
-    assert 'paths' in response.json
-    assert '/' in response.json['paths']
+    assert response.json == data
 
 
 def test_spec_url_ignore_params(app, client):

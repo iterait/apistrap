@@ -31,9 +31,8 @@ async def test_aiohttp_spec_url_repeated_call(aiohttp_client):
     response = await client.get('/spec.json')
 
     assert response.status == 200
-    data = await response.json()
-    assert 'paths' in data
-    assert '/' in data['paths']
+    new_data = await response.json()
+    assert new_data == data
 
 
 async def test_aiohttp_spec_url_weird_method(aiohttp_client):
@@ -44,11 +43,6 @@ async def test_aiohttp_spec_url_weird_method(aiohttp_client):
     oapi.init_app(app)
 
     @routes.route('options', '/')
-    async def view(request):
-        return web.Response(content_type="application/json", text=json.dumps({
-            "status": "OK"
-        }))
-
     @routes.get('/')
     async def view(request):
         return web.Response(content_type="application/json", text=json.dumps({
