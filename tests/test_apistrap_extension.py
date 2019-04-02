@@ -113,5 +113,4 @@ def test_set_ui_url(app, client):
     oapi.init_app(app)
 
     response = client.get("/docs/")
-    print(response.json)
     assert response.status_code == 200

@@ -47,6 +47,7 @@ class IgnoreParamsDecorator:
     def __call__(self, wrapped_func):
         for param in self._ignored_params:
             _add_ignored_param(wrapped_func, param)
+        return wrapped_func
 
 
 class RespondsWithDecorator:
