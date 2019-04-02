@@ -130,3 +130,8 @@ def test_no_injection_parameter(app, flask_apistrap):
 
     with pytest.raises(TypeError):
         flask_apistrap.accepts(Request)(view)
+
+
+def test_invalid_json(app_with_accepts, flask_apistrap, client):
+    response = client.post("/", json="asdfasdf")
+    assert response.status_code == 400

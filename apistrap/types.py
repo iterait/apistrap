@@ -3,7 +3,6 @@ from io import BytesIO
 from typing import Union
 from typing.io import BinaryIO
 
-import numpy as np
 from schematics.exceptions import BaseError, CompoundError, ValidationError
 from schematics.types import FloatType, ListType
 
@@ -96,6 +95,11 @@ class NonNanFloatType(FloatType):
         super().__init__(**kwargs)
 
     def to_native(self, value, context=None):
+        try:
+            import numpy as np
+        except ImportError as ex:
+            raise ImportError('NonNanFloatType requires Numpy.') from ex
+
         if np.isreal(value) and np.isscalar(value) and np.isnan(value):  # detect NaN
             if self._default_value == NonNanFloatType._NOT_SET_VALUE:  # user hasn't set the default value
                 raise ValidationError("The value is NaN")

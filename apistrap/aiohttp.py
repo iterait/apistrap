@@ -90,7 +90,10 @@ class AioHTTPAcceptsDecorator(AcceptsDecorator):
         return request.content_type
 
     async def _get_request_json(self, request: BaseRequest, *args, **kwargs):
-        return await request.json()
+        data = await request.json()
+        if isinstance(data, str):
+            raise ApiClientError("The request body must be a JSON object")
+        return data
 
 
 ErrorHandler = Callable[[Exception], Tuple[ErrorResponse, int]]

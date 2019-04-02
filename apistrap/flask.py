@@ -53,6 +53,9 @@ class FlaskAcceptsDecorator(AcceptsDecorator):
         return request.content_type
 
     def _get_request_json(self, *args, **kwargs):
+        if request.json is None or isinstance(request.json, str):
+            raise ApiClientError("The request body must be a JSON object")
+
         return request.json
 
 
