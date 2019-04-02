@@ -1,6 +1,8 @@
 more_itertools
 apispec
 schematics
+numpy
+Werkzeug
 
 flask>=1.0 # optional
 aiohttp # optional
