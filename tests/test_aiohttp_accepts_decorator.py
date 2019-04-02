@@ -28,6 +28,7 @@ def app_with_accepts(aiohttp_apistrap):
         }))
 
     app.add_routes(routes)
+    aiohttp_apistrap.init_app(app)
     yield app
 
 
@@ -39,3 +40,9 @@ async def test_accepts(app_with_accepts, aiohttp_client):
     }))
 
     assert response.status == 200
+
+
+async def test_invalid_json(app_with_accepts, aiohttp_client):
+    client = await aiohttp_client(app_with_accepts)
+    response = await client.post("/", json="asdfasdf")
+    assert response.status == 400
