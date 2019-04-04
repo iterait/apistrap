@@ -1,5 +1,5 @@
 from inspect import getmro
-from typing import Any, Dict, Generator, Type
+from typing import Any, Dict, Generator, Type, Optional
 
 from schematics import Model
 from schematics.types.base import (
@@ -27,7 +27,7 @@ def _get_serialized_name(field: BaseType) -> str:
 
 def _model_fields_to_schema_object_properties(model: Type[Model]) -> Dict[str, Any]:
     """
-    Convert all fields of a model to OpenAPI 2 SchemaObject Properties objects
+    Convert all fields of a model to OpenAPI 3 SchemaObject Properties objects
 
     :param model: the model to be converted
     :return: a dictionary with field names as keys and SchemaObjects as values
@@ -36,25 +36,40 @@ def _model_fields_to_schema_object_properties(model: Type[Model]) -> Dict[str, A
 
     for field in model._fields.values():
         serialized_name = _get_serialized_name(field)
+        schema_object = _field_to_schema_object(field)
 
-        if isinstance(field, ModelType):
-            properties[serialized_name] = schematics_model_to_schema_object(field.model_class)
-        elif isinstance(field, ListType):
-            if isinstance(field.field, ModelType):
-                properties[serialized_name] = _model_array_to_schema_object(field.field.model_class)
-            elif isinstance(field.field, BaseType):
-                properties[serialized_name] = _primitive_array_to_schema_object(field.field)
-        elif isinstance(field, DictType):
-            if isinstance(field.field, ModelType):
-                properties[serialized_name] = _model_dict_to_schema_object(field.field.model_class)
-            elif isinstance(field.field, BaseType):
-                properties[serialized_name] = _primitive_dict_to_schema_object(field.field)
-        elif isinstance(field, StringType):
-            properties[serialized_name] = _string_field_to_schema_object(field)
-        elif isinstance(field, BaseType):
-            properties[serialized_name] = _primitive_field_to_schema_object(field)
+        if schema_object is not None:
+            properties[serialized_name] = schema_object
 
     return properties
+
+
+def _field_to_schema_object(field: BaseType) -> Optional[Dict[str, Any]]:
+    """
+    Convert a field definition to OpenAPI 3 schema.
+
+    :param field: the field to be converted
+    :return: a schema
+    """
+
+    if isinstance(field, ModelType):
+        return schematics_model_to_schema_object(field.model_class)
+    elif isinstance(field, ListType):
+        if isinstance(field.field, ModelType):
+            return _model_array_to_schema_object(field.field.model_class)
+        elif isinstance(field.field, BaseType):
+            return _primitive_array_to_schema_object(field.field)
+    elif isinstance(field, DictType):
+        if isinstance(field.field, ModelType):
+            return _model_dict_to_schema_object(field.field.model_class)
+        elif isinstance(field.field, BaseType):
+            return _primitive_dict_to_schema_object(field.field)
+    elif isinstance(field, StringType):
+        return _string_field_to_schema_object(field)
+    elif isinstance(field, BaseType):
+        return _primitive_field_to_schema_object(field)
+
+    return None
 
 
 SCHEMATICS_TYPE_TO_JSON_TYPE = {
@@ -157,7 +172,7 @@ def _primitive_array_to_schema_object(field: BaseType) -> Dict[str, Any]:
     return {
         "type": "array",
         "title": "List of {}".format(field.__class__.__name__),
-        "items": _primitive_field_to_schema_object(field),
+        "items": _field_to_schema_object(field),
     }
 
 
@@ -171,7 +186,7 @@ def _primitive_dict_to_schema_object(field: BaseType) -> Dict[str, Any]:
     return {
         "type": "object",
         "title": "Dictionary of {}".format(field.__class__.__name__),
-        "additionalProperties": _primitive_field_to_schema_object(field),
+        "additionalProperties": _field_to_schema_object(field),
     }
 
 
