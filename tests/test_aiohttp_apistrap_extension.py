@@ -1,9 +1,10 @@
-import pytest
 import json
 
-from apistrap.errors import ApistrapExtensionError
-from apistrap.aiohttp import AioHTTPApistrap
+import pytest
 from aiohttp import web
+
+from apistrap.aiohttp import AioHTTPApistrap
+from apistrap.errors import ApistrapExtensionError
 
 
 async def test_aiohttp_apistrap_extension_definition_conflict_1():

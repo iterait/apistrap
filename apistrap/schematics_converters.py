@@ -1,17 +1,9 @@
 from inspect import getmro
-from typing import Any, Dict, Generator, Type, Optional
+from typing import Any, Dict, Generator, Optional, Type
 
 from schematics import Model
-from schematics.types.base import (
-    BaseType,
-    BooleanType,
-    DecimalType,
-    FloatType,
-    IntType,
-    LongType,
-    NumberType,
-    StringType,
-)
+from schematics.types.base import (BaseType, BooleanType, DecimalType, FloatType, IntType, LongType, NumberType,
+                                   StringType)
 from schematics.types.compound import DictType, ListType, ModelType
 
 
@@ -121,9 +113,7 @@ def _extract_model_description(field: BaseType) -> Dict[str, Any]:
 
 
 def _primitive_field_to_schema_object(field: BaseType) -> Dict[str, str]:
-    schema = {
-        "type": _get_field_type(field)
-    }
+    schema = {"type": _get_field_type(field)}
 
     schema.update(_extract_model_description(field))
 
@@ -168,11 +158,7 @@ def _model_array_to_schema_object(field: ModelType) -> Dict[str, Any]:
 
     model = field.field.model_class
 
-    schema = {
-        "type": "array",
-        "title": f"List of {model.__name__}",
-        "items": schematics_model_to_schema_object(model)
-    }
+    schema = {"type": "array", "title": f"List of {model.__name__}", "items": schematics_model_to_schema_object(model)}
 
     schema.update(_extract_model_description(field))
 
@@ -230,7 +216,7 @@ def _primitive_dict_to_schema_object(field: DictType) -> Dict[str, Any]:
     schema = {
         "type": "object",
         "title": f"Dictionary of {field.field.__class__.__name__}",
-        "additionalProperties": _field_to_schema_object(field.field)
+        "additionalProperties": _field_to_schema_object(field.field),
     }
 
     schema.update(_extract_model_description(field))
