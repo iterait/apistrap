@@ -1,14 +1,20 @@
+from __future__ import annotations
+
 import abc
 import inspect
 from functools import wraps
-from typing import Callable, Optional, Sequence, Type
+from typing import Callable, Optional, Sequence, Type, TYPE_CHECKING
 
 from schematics import Model
 from schematics.exceptions import DataError
 
 from apistrap.errors import ApiClientError, InvalidFieldsError
+from apistrap.examples import ExamplesMixin, model_examples_to_openapi_dict
 from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.types import FileResponse
+
+if TYPE_CHECKING:
+    from apistrap.extension import Apistrap
 
 
 def _ensure_specs_dict(func: Callable):
@@ -64,7 +70,7 @@ class RespondsWithDecorator:
 
     def __init__(
         self,
-        apistrap: "apistrap.extension.Apistrap",
+        apistrap: Apistrap,
         response_class: Type[Model],
         *,
         code: int = 200,
@@ -100,6 +106,10 @@ class RespondsWithDecorator:
                     }
                 },
             }
+
+            if issubclass(self._response_class, ExamplesMixin):
+                wrapped_func.specs_dict["responses"][str(self._code)]["content"]["application/json"]["examples"] = \
+                    model_examples_to_openapi_dict(self._response_class)
 
         innermost_func = _get_wrapped_function(wrapped_func)
         self.outermost_decorators[innermost_func] = self
@@ -139,9 +149,19 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
     The destination argument must be annotated with the request type.
     """
 
-    def __init__(self, apistrap: "apistrap.extension.Apistrap", request_class: Type[Model]):
+    def __init__(self, apistrap: Apistrap, request_class: Type[Model]):
         self._apistrap = apistrap
         self._request_class = request_class
+
+    def _find_parameter_by_request_class(self, signature: inspect.Signature) -> Optional[inspect.Parameter]:
+        for parameter in signature.parameters.values():
+            if isinstance(parameter.annotation, str):
+                if parameter.annotation == self._request_class.__qualname__:
+                    return parameter
+            elif isinstance(parameter.annotation, type):
+                if issubclass(self._request_class, parameter.annotation):
+                    return parameter
+        return None
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
@@ -160,12 +180,14 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
             "required": True,
         }
 
+        if issubclass(self._request_class, ExamplesMixin):
+            wrapped_func.specs_dict["requestBody"]["content"]["application/json"]["examples"] = \
+                model_examples_to_openapi_dict(self._request_class)
+
         wrapped_func.specs_dict["x-codegen-request-body-name"] = "body"
 
         signature = inspect.signature(wrapped_func)
-        request_arg = next(
-            filter(lambda arg: issubclass(self._request_class, arg.annotation), signature.parameters.values()), None
-        )
+        request_arg = self._find_parameter_by_request_class(signature)
 
         if request_arg is None:
             raise TypeError(f"no argument of type `{self._request_class}` found")
@@ -252,7 +274,7 @@ class SecurityDecorator:
     A decorator that enforces user authentication and authorization.
     """
 
-    def __init__(self, extension: "apistrap.extension.Apistrap", scopes: Sequence[str]):
+    def __init__(self, extension: Apistrap, scopes: Sequence[str]):
         self._extension = extension
         self._scopes = scopes
 
