@@ -74,7 +74,6 @@ def test_responses_in_spec_json(app_with_responds_with, client):
     response = client.get("/spec.json")
 
     assert "components" in response.json
-    assert "responses" in response.json["components"]
 
     # test ok response
     assert "200" in response.json["paths"]["/"]["get"]["responses"]
