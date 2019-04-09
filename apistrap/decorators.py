@@ -108,9 +108,10 @@ class RespondsWithDecorator:
             }
 
             if issubclass(self._response_class, ExamplesMixin):
-                wrapped_func.specs_dict["responses"][str(self._code)]["content"]["application/json"][
-                    "examples"
-                ] = model_examples_to_openapi_dict(self._response_class)
+                # fmt: off
+                wrapped_func.specs_dict["responses"][str(self._code)]["content"]["application/json"]["examples"] = \
+                    model_examples_to_openapi_dict(self._response_class)
+                # fmt: on
 
         innermost_func = _get_wrapped_function(wrapped_func)
         self.outermost_decorators[innermost_func] = self
@@ -182,9 +183,10 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
         }
 
         if issubclass(self._request_class, ExamplesMixin):
-            wrapped_func.specs_dict["requestBody"]["content"]["application/json"][
-                "examples"
-            ] = model_examples_to_openapi_dict(self._request_class)
+            # fmt: off
+            wrapped_func.specs_dict["requestBody"]["content"]["application/json"]["examples"] = \
+                model_examples_to_openapi_dict(self._request_class)
+            # fmt: on
 
         wrapped_func.specs_dict["x-codegen-request-body-name"] = "body"
 
