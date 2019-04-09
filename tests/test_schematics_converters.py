@@ -150,3 +150,27 @@ def test_schematics_to_schema_object_primitive_dict():
         'title': 'PrimitiveDictModel',
         'type': 'object'
     }
+
+
+class NestedDictModel(Model):
+    data = DictType(DictType(StringType))
+
+
+def test_schematics_to_schema_object_nested_dict():
+    assert schematics_model_to_schema_object(NestedDictModel) == {
+        'properties': {
+            'data': {
+                'additionalProperties': {
+                    'type': 'object',
+                    'title': 'Dictionary of StringType',
+                    'additionalProperties': {
+                        'type': 'string'
+                    }
+                },
+                'title': 'Dictionary of DictType',
+                'type': 'object'
+            }
+        },
+        'title': 'NestedDictModel',
+        'type': 'object'
+    }
