@@ -128,7 +128,7 @@ def _model_array_to_schema_object(model: Type[Model]) -> Dict[str, Any]:
     """
     return {
         "type": "array",
-        "title": "List of {}".format(model.__name__),
+        "title": f"List of {model.__name__}",
         "items": schematics_model_to_schema_object(model),
     }
 
@@ -142,7 +142,7 @@ def _model_dict_to_schema_object(model: Type[Model]) -> Dict[str, Any]:
     """
     return {
         "type": "object",
-        "title": "Dictionary of {}".format(model.__name__),
+        "title": f"Dictionary of {model.__name__}",
         "additionalProperties": schematics_model_to_schema_object(model),
     }
 
@@ -156,7 +156,7 @@ def _primitive_array_to_schema_object(field: BaseType) -> Dict[str, Any]:
     """
     return {
         "type": "array",
-        "title": "List of {}".format(field.__class__.__name__),
+        "title": f"List of {field.__class__.__name__}",
         "items": _primitive_field_to_schema_object(field),
     }
 
@@ -170,7 +170,7 @@ def _primitive_dict_to_schema_object(field: BaseType) -> Dict[str, Any]:
     """
     return {
         "type": "object",
-        "title": "Dictionary of {}".format(field.__class__.__name__),
+        "title": f"Dictionary of {field.__class__.__name__}",
         "additionalProperties": _primitive_field_to_schema_object(field),
     }
 
