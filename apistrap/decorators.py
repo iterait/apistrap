@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import inspect
 from functools import wraps
-from typing import Callable, Optional, Sequence, Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Type
 
 from schematics import Model
 from schematics.exceptions import DataError
@@ -75,7 +75,7 @@ class RespondsWithDecorator:
         *,
         code: int = 200,
         description: Optional[str] = None,
-        mimetype: Optional[str] = None
+        mimetype: Optional[str] = None,
     ):
         self._response_class = response_class
         self._code = code
@@ -108,8 +108,9 @@ class RespondsWithDecorator:
             }
 
             if issubclass(self._response_class, ExamplesMixin):
-                wrapped_func.specs_dict["responses"][str(self._code)]["content"]["application/json"]["examples"] = \
-                    model_examples_to_openapi_dict(self._response_class)
+                wrapped_func.specs_dict["responses"][str(self._code)]["content"]["application/json"][
+                    "examples"
+                ] = model_examples_to_openapi_dict(self._response_class)
 
         innermost_func = _get_wrapped_function(wrapped_func)
         self.outermost_decorators[innermost_func] = self
@@ -181,8 +182,9 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
         }
 
         if issubclass(self._request_class, ExamplesMixin):
-            wrapped_func.specs_dict["requestBody"]["content"]["application/json"]["examples"] = \
-                model_examples_to_openapi_dict(self._request_class)
+            wrapped_func.specs_dict["requestBody"]["content"]["application/json"][
+                "examples"
+            ] = model_examples_to_openapi_dict(self._request_class)
 
         wrapped_func.specs_dict["x-codegen-request-body-name"] = "body"
 

@@ -5,10 +5,10 @@ from typing import List
 import pytest
 from flask import jsonify
 from schematics import Model
-from schematics.types import StringType, IntType
+from schematics.types import IntType, StringType
 
-from apistrap.flask import FlaskApistrap
 from apistrap.examples import ExamplesMixin, ModelExample
+from apistrap.flask import FlaskApistrap
 
 
 @pytest.fixture(scope="function")

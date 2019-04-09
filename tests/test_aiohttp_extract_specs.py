@@ -1,8 +1,9 @@
-import pytest
 import json
 
-from apistrap.aiohttp import AioHTTPApistrap
+import pytest
 from aiohttp import web
+
+from apistrap.aiohttp import AioHTTPApistrap
 
 
 async def test_aiohttp_spec_url_repeated_call(aiohttp_client):

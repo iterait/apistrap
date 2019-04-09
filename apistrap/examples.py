@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, List, Optional, TypeVar, Dict, Any, Type
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
 from schematics import Model
 
@@ -43,9 +43,7 @@ def model_examples_to_openapi_dict(model: Type[ExamplesMixin]) -> Dict[str, Any]
     examples = {}
 
     for example in model.get_examples():
-        examples[example.name] = {
-            "value": example.value.to_primitive()
-        }
+        examples[example.name] = {"value": example.value.to_primitive()}
 
         if example.summary is not None:
             examples[example.name]["summary"] = example.summary
