@@ -19,7 +19,7 @@ class InvalidFieldsError(ApiClientError):
     """
 
     def __init__(self, errors: Dict[str, List[str]]):
-        super().__init__("Invalid input: {}".format(str(errors)))
+        super().__init__(f"Invalid input: `{str(errors)}`")
         self.errors = errors
 
 
@@ -35,7 +35,7 @@ class UnexpectedResponseError(ApiServerError):
     """
 
     def __init__(self, response_class: type):
-        super().__init__("Unexpected response class: {}".format(response_class.__name__))
+        super().__init__(f"Unexpected response class: `{response_class.__name__}`")
 
 
 class InvalidResponseError(ApiServerError):
@@ -44,5 +44,5 @@ class InvalidResponseError(ApiServerError):
     """
 
     def __init__(self, errors: Dict[str, List[str]]):
-        super().__init__("Invalid input: {}".format(str(errors)))
+        super().__init__(f"Invalid input: `{str(errors)}`")
         self.errors = errors
