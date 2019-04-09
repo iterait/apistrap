@@ -1,5 +1,5 @@
 from schematics import Model
-from schematics.types import DictType, FloatType, IntType, ListType, LongType, ModelType, NumberType, StringType
+from schematics.types import DictType, IntType, ListType, ModelType, StringType
 
 from apistrap.schematics_converters import schematics_model_to_schema_object
 
@@ -148,5 +148,76 @@ def test_schematics_to_schema_object_primitive_dict():
             }
         },
         'title': 'PrimitiveDictModel',
+        'type': 'object'
+    }
+
+
+class NestedDictModel(Model):
+    data = DictType(DictType(StringType))
+
+
+def test_schematics_to_schema_object_nested_dict():
+    assert schematics_model_to_schema_object(NestedDictModel) == {
+        'properties': {
+            'data': {
+                'additionalProperties': {
+                    'type': 'object',
+                    'title': 'Dictionary of StringType',
+                    'additionalProperties': {
+                        'type': 'string'
+                    }
+                },
+                'title': 'Dictionary of DictType',
+                'type': 'object'
+            }
+        },
+        'title': 'NestedDictModel',
+        'type': 'object'
+    }
+
+
+class ModelWithDescriptions(Model):
+    primitive = IntType(metadata={"label": "Primitive title", "description": "Primitive description"})
+    list = ListType(StringType(), metadata={"label": "List title", "description": "List description"})
+    dict = DictType(StringType(), metadata={"label": "Dict title", "description": "Dict description"})
+    model = ModelType(ExampleModel, metadata={"label": "Model title", "description": "Model description"})
+
+
+def test_schematics_to_schema_object_descriptions():
+    assert schematics_model_to_schema_object(ModelWithDescriptions) == {
+        'properties': {
+            'primitive': {
+                'type': 'integer',
+                'title': 'Primitive title',
+                'description': 'Primitive description',
+            },
+            'list': {
+                'type': 'array',
+                'items': {
+                    'type': 'string'
+                },
+                'title': 'List title',
+                'description': 'List description',
+            },
+            'dict': {
+                'type': 'object',
+                'additionalProperties': {
+                    'type': 'string'
+                },
+                'title': 'Dict title',
+                'description': 'Dict description',
+            },
+            'model': {
+                'type': 'object',
+                'title': 'Model title',
+                'description': 'Model description',
+                'properties': {
+                    'string': {
+                        'type': 'string'
+                    }
+                }
+            },
+        },
+        'title': 'ModelWithDescriptions',
         'type': 'object'
     }

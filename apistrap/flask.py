@@ -1,4 +1,5 @@
 import inspect
+import json
 import logging
 import re
 from copy import deepcopy
@@ -53,8 +54,11 @@ class FlaskAcceptsDecorator(AcceptsDecorator):
         return request.content_type
 
     def _get_request_json(self, *args, **kwargs):
-        if request.json is None or isinstance(request.json, str):
-            raise ApiClientError("The request body must be a JSON object")
+        try:
+            if request.json is None or isinstance(request.json, str):
+                raise ApiClientError("The request body must be a JSON object")
+        except json.decoder.JSONDecodeError as ex:
+            raise ApiClientError("The request body must be a JSON object") from ex
 
         return request.json
 

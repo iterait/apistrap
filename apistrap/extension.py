@@ -182,9 +182,9 @@ class Apistrap(metaclass=ABCMeta):
         """
 
         components = self.spec.components.to_dict()
-        if name in components["schemas"]:
+        if "schemas" in components and name in components["schemas"]:
             if components["schemas"][name] != schema:
-                raise ValueError("Conflicting definitions of `{}`".format(name))
+                raise ValueError(f"Conflicting definitions of `{name}`")
         else:
             self.spec.components.schema(name, schema)
 
@@ -201,9 +201,9 @@ class Apistrap(metaclass=ABCMeta):
         """
 
         components = self.spec.components.to_dict()
-        if name in components["responses"]:
+        if "responses" in components and name in components["responses"]:
             if components["responses"][name] != schema:
-                raise ValueError("Conflicting definitions of `{}`".format(name))
+                raise ValueError(f"Conflicting definitions of `{name}`")
         else:
             self.spec.components.response(name, schema)
 
@@ -220,9 +220,9 @@ class Apistrap(metaclass=ABCMeta):
         """
 
         components = self.spec.components.to_dict()
-        if name in components["schemas"]:
+        if "schemas" in components and name in components["schemas"]:
             if components["schemas"][name] != schema:
-                raise ValueError("Conflicting definitions of `{}`".format(name))
+                raise ValueError(f"Conflicting definitions of `{name}`")
         else:
             self.spec.components.schema(name, schema)
 

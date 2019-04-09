@@ -1,7 +1,7 @@
 import pytest
+from aiohttp import web
 
 from apistrap.aiohttp import AioHTTPApistrap
-from aiohttp import web
 
 
 async def test_aiohttp_title_in_spec_json(aiohttp_client):

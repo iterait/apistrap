@@ -98,7 +98,7 @@ class NonNanFloatType(FloatType):
         try:
             import numpy as np
         except ImportError as ex:
-            raise ImportError('NonNanFloatType requires Numpy.') from ex
+            raise ImportError("NonNanFloatType requires Numpy.") from ex
 
         if np.isreal(value) and np.isscalar(value) and np.isnan(value):  # detect NaN
             if self._default_value == NonNanFloatType._NOT_SET_VALUE:  # user hasn't set the default value
