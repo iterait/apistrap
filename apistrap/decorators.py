@@ -190,7 +190,7 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
         request_arg = self._find_parameter_by_request_class(signature)
 
         if request_arg is None:
-            raise TypeError("no argument of type {} found".format(self._request_class))
+            raise TypeError(f"no argument of type `{self._request_class}` found")
 
         if inspect.iscoroutinefunction(wrapped_func):
 

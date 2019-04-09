@@ -170,8 +170,8 @@ def _model_array_to_schema_object(field: ModelType) -> Dict[str, Any]:
 
     schema = {
         "type": "array",
-        "items": schematics_model_to_schema_object(model),
-        "title": "List of {}".format(model.__name__)
+        "title": f"List of {model.__name__}",
+        "items": schematics_model_to_schema_object(model)
     }
 
     schema.update(_extract_model_description(field))
@@ -191,7 +191,7 @@ def _model_dict_to_schema_object(field: DictType) -> Dict[str, Any]:
 
     schema = {
         "type": "object",
-        "title": "Dictionary of {}".format(model.__name__),
+        "title": f"Dictionary of {model.__name__}",
         "additionalProperties": schematics_model_to_schema_object(model),
     }
 
@@ -210,7 +210,7 @@ def _primitive_array_to_schema_object(field: ListType) -> Dict[str, Any]:
 
     schema = {
         "type": "array",
-        "title": "List of {}".format(field.field.__class__.__name__),
+        "title": f"List of {field.field.__class__.__name__}",
         "items": _field_to_schema_object(field.field),
     }
 
@@ -229,8 +229,8 @@ def _primitive_dict_to_schema_object(field: DictType) -> Dict[str, Any]:
 
     schema = {
         "type": "object",
-        "title": "Dictionary of {}".format(field.field.__class__.__name__),
-        "additionalProperties": _field_to_schema_object(field.field),
+        "title": f"Dictionary of {field.field.__class__.__name__}",
+        "additionalProperties": _field_to_schema_object(field.field)
     }
 
     schema.update(_extract_model_description(field))
