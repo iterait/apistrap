@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import inspect
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, Optional, Sequence, Type
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Type, Union
 
 from schematics import Model
 from schematics.exceptions import DataError
@@ -11,6 +11,7 @@ from schematics.exceptions import DataError
 from apistrap.errors import ApiClientError, InvalidFieldsError
 from apistrap.examples import ExamplesMixin, model_examples_to_openapi_dict
 from apistrap.schematics_converters import schematics_model_to_schema_object
+from apistrap.tags import TagData
 from apistrap.types import FileResponse
 
 if TYPE_CHECKING:
@@ -263,13 +264,20 @@ class TagsDecorator:
     A decorator that adds tags to the OpenAPI specification of the decorated view function.
     """
 
-    def __init__(self, tags: Sequence[str]):
+    def __init__(self, extension: Apistrap, tags: Sequence[Union[str, TagData]]):
         self._tags = tags
+        self._extension = extension
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
         wrapped_func.specs_dict.setdefault("tags", [])
-        wrapped_func.specs_dict["tags"].extend(self._tags)
+
+        for tag in self._tags:
+            wrapped_func.specs_dict["tags"].append(tag.name if isinstance(tag, TagData) else tag)
+
+            if isinstance(tag, TagData):
+                self._extension.add_tag_data(tag)
+
         return wrapped_func
 
 
