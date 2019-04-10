@@ -249,7 +249,7 @@ class Apistrap(metaclass=ABCMeta):
         if "tags" not in spec or tag.name not in map(lambda t: t["name"], spec["tags"]):
             self.spec.tag(tag.to_dict())
 
-    def tags(self, *tags: Union[str, TagData]):
+    def tags(self, *tags: Union[str, TagData]) -> TagsDecorator:
         """
         A decorator that adds tags to the OpenAPI specification of the decorated view function.
         """
