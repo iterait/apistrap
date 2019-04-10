@@ -8,6 +8,7 @@ from schematics import Model
 
 from apistrap.decorators import IgnoreDecorator, IgnoreParamsDecorator, SecurityDecorator, TagsDecorator
 from apistrap.errors import ApistrapExtensionError
+from apistrap.tags import TagData
 
 
 class SecurityScheme(metaclass=ABCMeta):
@@ -237,6 +238,14 @@ class Apistrap(metaclass=ABCMeta):
 
         self.security_schemes.append(scheme)
         self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
+
+    def add_tag_data(self, tag: TagData) -> None:
+        """
+        Add information about a tag to the specification.
+        :param tag: data about the tag
+        """
+
+        self.spec.tag(tag.to_dict())
 
     def tags(self, *tags: str):
         """
