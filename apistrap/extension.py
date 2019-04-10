@@ -1,6 +1,6 @@
 import abc
 from abc import ABCMeta
-from typing import Callable, Dict, List, Optional, Type
+from typing import Callable, Dict, List, Optional, Type, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
@@ -8,6 +8,7 @@ from schematics import Model
 
 from apistrap.decorators import IgnoreDecorator, IgnoreParamsDecorator, SecurityDecorator, TagsDecorator
 from apistrap.errors import ApistrapExtensionError
+from apistrap.tags import TagData
 
 
 class SecurityScheme(metaclass=ABCMeta):
@@ -238,11 +239,21 @@ class Apistrap(metaclass=ABCMeta):
         self.security_schemes.append(scheme)
         self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
 
-    def tags(self, *tags: str):
+    def add_tag_data(self, tag: TagData) -> None:
+        """
+        Add information about a tag to the specification.
+        :param tag: data about the tag
+        """
+
+        spec = self.spec.to_dict()
+        if "tags" not in spec or tag.name not in map(lambda t: t["name"], spec["tags"]):
+            self.spec.tag(tag.to_dict())
+
+    def tags(self, *tags: Union[str, TagData]) -> TagsDecorator:
         """
         A decorator that adds tags to the OpenAPI specification of the decorated view function.
         """
-        return TagsDecorator(tags)
+        return TagsDecorator(self, tags)
 
     def ignore(self):
         """
