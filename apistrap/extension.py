@@ -1,6 +1,6 @@
 import abc
 from abc import ABCMeta
-from typing import Callable, Dict, List, Optional, Type
+from typing import Callable, Dict, List, Optional, Type, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
@@ -245,13 +245,15 @@ class Apistrap(metaclass=ABCMeta):
         :param tag: data about the tag
         """
 
-        self.spec.tag(tag.to_dict())
+        spec = self.spec.to_dict()
+        if "tags" not in spec or tag.name not in map(lambda t: t["name"], spec["tags"]):
+            self.spec.tag(tag.to_dict())
 
-    def tags(self, *tags: str):
+    def tags(self, *tags: Union[str, TagData]):
         """
         A decorator that adds tags to the OpenAPI specification of the decorated view function.
         """
-        return TagsDecorator(tags)
+        return TagsDecorator(self, tags)
 
     def ignore(self):
         """
