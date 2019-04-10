@@ -7,7 +7,7 @@ class TagData:
     name: str
     description: Optional[str] = None
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         result = {"name": self.name}
 
         if self.description is not None:
