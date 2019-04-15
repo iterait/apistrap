@@ -1,7 +1,8 @@
 # Apistrap - HTTP API utilities
 
-[![CircleCI](https://circleci.com/gh/iterait/apistrap.png?style=shield&circle-token=6e0633d5636dd5b858dd4db501695e10b16f373f)](https://circleci.com/gh/iterait/apistrap/tree/master)
+[![CircleCI](https://circleci.com/gh/iterait/apistrap.png?style=shield&circle-token=6e0633d5636dd5b858dd4db501695e10b16f373f)](https://circleci.com/gh/iterait/apistrap/tree/dev)
 [![Coverage](https://img.shields.io/coveralls/github/iterait/apistrap.svg)](https://coveralls.io/github/iterait/apistrap)
+[![PyPi](https://img.shields.io/pypi/v/apistrap.svg)](https://pypi.org/project/apistrap/)
 [![Development Status](https://img.shields.io/badge/status-Regular-brightgreen.svg?style=flat)]()
 [![Master Developer](https://img.shields.io/badge/master-Jan%20Buchar-lightgrey.svg?style=flat)]()
 
