@@ -27,7 +27,7 @@ references:
     run:
       name: Report test coverage
       command: |
-        coverage run setup.py test
+        coverage run --source=apistrap setup.py test
         coverage report
         COVERALLS_REPO_TOKEN=QEAuo5Pufwd8TGqQiqt7a1HWWp3i9mL0Y coveralls
 
