@@ -1,4 +1,5 @@
 import abc
+import re
 from abc import ABCMeta
 from typing import Callable, Dict, List, Optional, Type, Union
 
@@ -151,6 +152,32 @@ class Apistrap(metaclass=ABCMeta):
 
     def _parameter_annotation_to_openapi_type(self, annotation):
         return self.PARAMETER_TYPE_MAP.get(annotation, "string")
+
+    def _summary_from_docblock(self, docblock: Optional[str]) -> str:
+        if docblock is None:
+            return ""
+
+        lines = [*map(lambda line: line.strip(), docblock.strip().splitlines())]
+
+        if "" in lines:
+            lines = lines[:lines.index("")]
+
+        return "\n".join(lines)
+
+    def _parameters_from_docblock(self, docblock: Optional[str]) -> Dict[str, str]:
+        if docblock is None:
+            return {}
+
+        lines = [*map(lambda line: line.strip(), docblock.strip().splitlines())]
+        result = {}
+
+        if "" in lines:
+            for line in lines[lines.index(""):]:
+                match = re.match(r"^:param\s+([^:]+):\s+(.+)", line)
+                if match is not None:
+                    result[match.group(1)] = match.group(2)
+
+        return result
 
     ############################
     # Configuration properties #

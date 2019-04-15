@@ -351,23 +351,30 @@ class AioHTTPApistrap(Apistrap):
         :return: a dict with specification data
         """
 
-        specs_dict = deepcopy(getattr(route.handler, "specs_dict", {"parameters": [], "responses": {}}))
-        specs_dict["summary"] = route.handler.__doc__.strip() if route.handler.__doc__ else ""
-        specs_dict["operationId"] = snake_to_camel(route.handler.__name__)
-
         handler = getattr(route.handler, self.SYNTHETIC_WRAPPER_ATTR, route.handler)
+
+        specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
+        specs_dict["summary"] = self._summary_from_docblock(handler.__doc__)
+        specs_dict["operationId"] = snake_to_camel(handler.__name__)
+
         signature = inspect.signature(handler)
+        param_doc = self._parameters_from_docblock(handler.__doc__)
 
         for param_name in self._get_route_parameter_names(route):
             parameter = signature.parameters.get(param_name, None)
             annotation = parameter.annotation if parameter else None
 
-            specs_dict["parameters"].append({
+            parameter = {
                 "in": "path",
                 "name": param_name,
                 "required": True,
                 "schema": {"type": self._parameter_annotation_to_openapi_type(annotation)}
-            })
+            }
+
+            if param_name in param_doc.keys():
+                parameter["description"] = param_doc[param_name]
+
+            specs_dict["parameters"].append(parameter)
 
         return specs_dict
 

@@ -148,11 +148,12 @@ class FlaskApistrap(Apistrap):
         """
 
         specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
-        specs_dict["summary"] = handler.__doc__.strip() if handler.__doc__ else ""
+        specs_dict["summary"] = self._summary_from_docblock(handler.__doc__)
         specs_dict["operationId"] = snake_to_camel(handler.__name__)
 
         signature = inspect.signature(handler)
         ignored = getattr(handler, "_ignored_params", [])
+        param_doc = self._parameters_from_docblock(handler.__doc__)
 
         for arg in signature.parameters.values():
             if arg.name not in ignored:
@@ -162,6 +163,9 @@ class FlaskApistrap(Apistrap):
                     "required": True,
                     "schema": {"type": self._parameter_annotation_to_openapi_type(arg.annotation)},
                 }
+
+                if arg.name in param_doc.keys():
+                    param_data["description"] = param_doc[arg.name]
 
                 specs_dict["parameters"].append(param_data)
 
