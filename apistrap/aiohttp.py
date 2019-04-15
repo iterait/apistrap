@@ -7,7 +7,7 @@ from copy import deepcopy
 from itertools import chain
 from os import path
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Optional, Tuple, Type, List
+from typing import Any, Callable, Coroutine, List, Optional, Tuple, Type
 
 import jinja2
 from aiohttp import web
@@ -288,10 +288,10 @@ class AioHTTPApistrap(Apistrap):
         if parameter.annotation == inspect.Parameter.empty:
             return value
 
-        if parameter.annotation == str or parameter.annotation == 'str':
+        if parameter.annotation == str or parameter.annotation == "str":
             return value
 
-        if parameter.annotation == int or parameter.annotation == 'int':
+        if parameter.annotation == int or parameter.annotation == "int":
             return int(value)
 
         return value
@@ -307,20 +307,24 @@ class AioHTTPApistrap(Apistrap):
         signature = inspect.signature(route.handler)
 
         request_param: Optional[inspect.Parameter] = next(
-            filter(lambda p: issubclass(p.annotation, BaseRequest), signature.parameters.values()),
-            None
+            filter(lambda p: issubclass(p.annotation, BaseRequest), signature.parameters.values()), None
         )
 
-        if not request_param and "request" in signature.parameters.keys() \
-                and signature.parameters["request"].annotation == inspect.Signature.empty:
+        if (
+            not request_param
+            and "request" in signature.parameters.keys()
+            and signature.parameters["request"].annotation == inspect.Signature.empty
+        ):
             request_param = signature.parameters["request"]
 
         takes_aiohttp_request = request_param is not None
 
-        additional_params: [inspect.Parameter] = [*filter(
-            lambda p: not takes_aiohttp_request or signature.parameters[p] != request_param,
-            signature.parameters.keys()
-        )]
+        additional_params: [inspect.Parameter] = [
+            *filter(
+                lambda p: not takes_aiohttp_request or signature.parameters[p] != request_param,
+                signature.parameters.keys(),
+            )
+        ]
 
         if not takes_aiohttp_request or additional_params:
             handler = route.handler
@@ -368,7 +372,7 @@ class AioHTTPApistrap(Apistrap):
                 "in": "path",
                 "name": param_name,
                 "required": True,
-                "schema": {"type": self._parameter_annotation_to_openapi_type(annotation)}
+                "schema": {"type": self._parameter_annotation_to_openapi_type(annotation)},
             }
 
             if param_name in param_doc.keys():

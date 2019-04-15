@@ -1,7 +1,7 @@
 import json
 
-from aiohttp import web
 import pytest
+from aiohttp import web
 
 from apistrap.aiohttp import AioHTTPApistrap
 

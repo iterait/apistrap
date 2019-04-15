@@ -160,7 +160,7 @@ class Apistrap(metaclass=ABCMeta):
         lines = [*map(lambda line: line.strip(), docblock.strip().splitlines())]
 
         if "" in lines:
-            lines = lines[:lines.index("")]
+            lines = lines[: lines.index("")]
 
         return "\n".join(lines)
 
@@ -172,7 +172,7 @@ class Apistrap(metaclass=ABCMeta):
         result = {}
 
         if "" in lines:
-            for line in lines[lines.index(""):]:
+            for line in lines[lines.index("") :]:
                 match = re.match(r"^:param\s+([^:]+):\s+(.+)", line)
                 if match is not None:
                     result[match.group(1)] = match.group(2)
