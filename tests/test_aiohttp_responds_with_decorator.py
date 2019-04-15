@@ -112,6 +112,7 @@ def app_with_responds_with(aiohttp_apistrap, tmpdir):
                             last_modified=2018)
 
     app.add_routes(routes)
+    aiohttp_apistrap.use_default_error_handlers = False
     aiohttp_apistrap.init_app(app)
     yield app
 
@@ -135,8 +136,8 @@ def aiohttp_catch_exceptions(app: web.Application):
         yield holder
 
 
-async def test_accepts(app_with_responds_with, aiohttp_client):
-    client = await aiohttp_client(app_with_responds_with)
+async def test_accepts(app_with_responds_with, aiohttp_initialized_client):
+    client = await aiohttp_initialized_client(app_with_responds_with)
     response = await client.get('/')
 
     assert response.status == 200
@@ -145,8 +146,8 @@ async def test_accepts(app_with_responds_with, aiohttp_client):
     assert data['string_field'] == 'Hello World'
 
 
-async def test_error(app_with_responds_with, aiohttp_client):
-    client = await aiohttp_client(app_with_responds_with)
+async def test_error(app_with_responds_with, aiohttp_initialized_client):
+    client = await aiohttp_initialized_client(app_with_responds_with)
     response = await client.get('/error')
 
     assert response.status == 400
@@ -155,8 +156,8 @@ async def test_error(app_with_responds_with, aiohttp_client):
     assert data['error_message'] == 'Error'
 
 
-async def test_weird(app_with_responds_with, aiohttp_client):
-    client = await aiohttp_client(app_with_responds_with)
+async def test_weird(app_with_responds_with, aiohttp_initialized_client):
+    client = await aiohttp_initialized_client(app_with_responds_with)
 
     with aiohttp_catch_exceptions(app_with_responds_with) as holder:
         await client.get('/weird')
@@ -164,8 +165,8 @@ async def test_weird(app_with_responds_with, aiohttp_client):
         assert isinstance(holder.exc, UnexpectedResponseError)
 
 
-async def test_invalid(app_with_responds_with, aiohttp_client):
-    client = await aiohttp_client(app_with_responds_with)
+async def test_invalid(app_with_responds_with, aiohttp_initialized_client):
+    client = await aiohttp_initialized_client(app_with_responds_with)
 
     with aiohttp_catch_exceptions(app_with_responds_with) as holder:
         await client.get('/invalid')
@@ -174,14 +175,14 @@ async def test_invalid(app_with_responds_with, aiohttp_client):
 
 
 @pytest.mark.parametrize('endpoint', ['/file', '/file_by_path'])
-async def test_file_response(aiohttp_client, app_with_responds_with, endpoint):
-    client = await aiohttp_client(app_with_responds_with)
+async def test_file_response(aiohttp_initialized_client, app_with_responds_with, endpoint):
+    client = await aiohttp_initialized_client(app_with_responds_with)
     response = await client.get(endpoint)
     assert await response.read() == b'hello'
 
 
-async def test_file_response_error(app_with_responds_with, aiohttp_client):
-    client = await aiohttp_client(app_with_responds_with)
+async def test_file_response_error(app_with_responds_with, aiohttp_initialized_client):
+    client = await aiohttp_initialized_client(app_with_responds_with)
 
     with aiohttp_catch_exceptions(app_with_responds_with) as holder:
         await client.get('/file_without_name')
@@ -190,15 +191,15 @@ async def test_file_response_error(app_with_responds_with, aiohttp_client):
 
 
 @pytest.mark.parametrize('endpoint', ['/file_with_mimetype', '/file_with_mimetype_decorator'])
-async def test_file_response_mimetype(aiohttp_client, app_with_responds_with, endpoint):
-    client = await aiohttp_client(app_with_responds_with)
+async def test_file_response_mimetype(aiohttp_initialized_client, app_with_responds_with, endpoint):
+    client = await aiohttp_initialized_client(app_with_responds_with)
     response = await client.get(endpoint)
     assert await response.read() == b'<a href="www.hello.com"></a>'
     assert response.headers['Content-Type'] == 'text/html'
 
 
-async def test_file_response_timestamp(aiohttp_client, app_with_responds_with):
-    client = await aiohttp_client(app_with_responds_with)
+async def test_file_response_timestamp(aiohttp_initialized_client, app_with_responds_with):
+    client = await aiohttp_initialized_client(app_with_responds_with)
     response = await client.get('/file_timestamp')
     assert await response.read() == b'hello'
     assert response.headers['Last-Modified'] == '2018'

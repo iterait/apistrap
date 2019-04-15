@@ -61,6 +61,20 @@ web.run_app(app)
 Please note that this is very similar to how Apistrap works with Flask. All decorators that work with Flask routes work
 the same with AioHTTP web routes. Also, you still have to put the route decorators on top.
 
+We also make it possible to read route parameters using function parameters like you would with Flask:
+
+```python
+from aiohttp import web
+from apistrap.aiohttp import AioHTTPApistrap
+
+oapi = AioHTTPApistrap()
+routes = web.RouteTableDef()
+
+@routes.get("/{param_a}/{param_b}")
+def endpoint(param_a: str, param_b: int):  # Note that the request parameter is optional
+    return web.Response(text="Lorem ipsum")
+```
+
 ### Request Body Parsing
 
 ```python

@@ -1,3 +1,4 @@
+import inspect
 import json
 import logging
 import mimetypes
@@ -6,7 +7,7 @@ from copy import deepcopy
 from itertools import chain
 from os import path
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Optional, Tuple, Type
+from typing import Any, Callable, Coroutine, Optional, Tuple, Type, List
 
 import jinja2
 from aiohttp import web
@@ -203,11 +204,12 @@ class ErrorHandlerMiddleware:
 
 
 class AioHTTPApistrap(Apistrap):
+    SYNTHETIC_WRAPPER_ATTR = "aiohttp_apistrap_wrapped_function"
+
     def __init__(self):
         super().__init__()
         self.app: web.Application = None
         self.error_middleware = ErrorHandlerMiddleware(self)
-        self._specs_extracted = False
         self._jinja_env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(path.join(path.dirname(__file__), "templates"))
         )
@@ -229,12 +231,13 @@ class AioHTTPApistrap(Apistrap):
                 for ui_url in (self.ui_url, self.ui_url + "/"):
                     app.router.add_route("get", ui_url, self._get_ui)
 
+        app.on_startup.append(self._process_routes)
+
     def _get_spec(self, request: Request):
         """
         Serves the OpenAPI specification
         """
 
-        self._extract_specs()
         return web.Response(text=json.dumps(self.to_openapi_dict()), content_type="application/json", status=200)
 
     _get_spec.apistrap_ignore = True
@@ -252,21 +255,24 @@ class AioHTTPApistrap(Apistrap):
 
     _get_ui.apistrap_ignore = True
 
+    async def _process_routes(self, *args, **kwargs) -> None:
+        self._extract_specs()
+
+        for route in self.app.router.routes():
+            if self._is_route_ignored(route.method, route.handler):
+                continue
+
+            self._process_route_parameters(route)
+
     def _extract_specs(self) -> None:
         """
         Extract the specification data from the bound AioHTTP app. If the data was already extracted, do not do
         anything.
         """
 
-        if self._specs_extracted:
-            return
-
         route: AbstractRoute
         for route in self.app.router.routes():
-            if getattr(route.handler, "apistrap_ignore", False):
-                continue
-
-            if route.method.lower() not in ["get", "post", "put", "delete", "patch"]:
+            if self._is_route_ignored(route.method, route.handler):
                 continue
 
             url = ""
@@ -278,7 +284,64 @@ class AioHTTPApistrap(Apistrap):
 
             self.spec.path(url, {route.method.lower(): self._extract_operation_spec(route)})
 
-        self._specs_extracted = True
+    def _parse_parameter_value(self, parameter: inspect.Parameter, value: str):
+        if parameter.annotation == inspect.Parameter.empty:
+            return value
+
+        if parameter.annotation == str or parameter.annotation == 'str':
+            return value
+
+        if parameter.annotation == int or parameter.annotation == 'int':
+            return int(value)
+
+        return value
+
+    def _process_route_parameters(self, route: AbstractRoute) -> None:
+        """
+        If necessary, wrap the route handler with a coroutine that accepts a AioHTTP request, extracts parameters to
+        satisfy the underlying handler and forwards them to the original handler.
+
+        :param route: the route whose handler should be wrapped
+        """
+
+        signature = inspect.signature(route.handler)
+
+        request_param: Optional[inspect.Parameter] = next(
+            filter(lambda p: issubclass(p.annotation, BaseRequest), signature.parameters.values()),
+            None
+        )
+
+        if not request_param and "request" in signature.parameters.keys() \
+                and signature.parameters["request"].annotation == inspect.Signature.empty:
+            request_param = signature.parameters["request"]
+
+        takes_aiohttp_request = request_param is not None
+
+        additional_params: [inspect.Parameter] = [*filter(
+            lambda p: not takes_aiohttp_request or signature.parameters[p] != request_param,
+            signature.parameters.keys()
+        )]
+
+        if not takes_aiohttp_request or additional_params:
+            handler = route.handler
+            accepted_path_params = set(self._get_route_parameter_names(route)).intersection(additional_params)
+
+            async def wrapped_handler(request: Request):
+                kwargs = {
+                    name: self._parse_parameter_value(signature.parameters[name], request.match_info[name])
+                    for name in accepted_path_params
+                }
+
+                if takes_aiohttp_request:
+                    kwargs[request_param.name] = request
+
+                bound_args: inspect.BoundArguments = signature.bind_partial(**kwargs)
+
+                return await handler(*bound_args.args, **bound_args.kwargs)
+
+            setattr(wrapped_handler, self.SYNTHETIC_WRAPPER_ATTR, handler)
+
+            route._handler = wrapped_handler  # HACK
 
     def _extract_operation_spec(self, route: AbstractRoute) -> dict:
         """
@@ -290,23 +353,29 @@ class AioHTTPApistrap(Apistrap):
 
         specs_dict = deepcopy(getattr(route.handler, "specs_dict", {"parameters": [], "responses": {}}))
         specs_dict["summary"] = route.handler.__doc__.strip() if route.handler.__doc__ else ""
-
-        if isinstance(route.resource, DynamicResource):
-            parameters = re.findall(r"{([a-zA-Z0-9]+[^}]*)}", route.resource.get_info()["formatter"])
-
-            for arg in parameters:
-                param_data = {
-                    "in": "path",
-                    "name": arg,
-                    "required": True,
-                    "schema": {"type": "string"},  # TODO support other types too
-                }
-
-                specs_dict["parameters"].append(param_data)
-
         specs_dict["operationId"] = snake_to_camel(route.handler.__name__)
 
+        handler = getattr(route.handler, self.SYNTHETIC_WRAPPER_ATTR, route.handler)
+        signature = inspect.signature(handler)
+
+        for param_name in self._get_route_parameter_names(route):
+            parameter = signature.parameters.get(param_name, None)
+            annotation = parameter.annotation if parameter else None
+
+            specs_dict["parameters"].append({
+                "in": "path",
+                "name": param_name,
+                "required": True,
+                "schema": {"type": self._parameter_annotation_to_openapi_type(annotation)}
+            })
+
         return specs_dict
+
+    def _get_route_parameter_names(self, route: AbstractRoute) -> List[str]:
+        if not isinstance(route.resource, DynamicResource):
+            return []
+
+        return re.findall(r"{([a-zA-Z0-9]+[^}]*)}", route.resource.get_info()["formatter"])
 
     def _is_bound(self) -> bool:
         return self.app is not None
