@@ -310,9 +310,11 @@ class AioHTTPApistrap(Apistrap):
 
         signature = inspect.signature(route.handler)
 
-        request_param: Optional[inspect.Parameter] = next(
-            filter(lambda p: issubclass(p.annotation, BaseRequest), signature.parameters.values()), None
-        )
+        request_params = filter(lambda p: issubclass(p.annotation, BaseRequest), signature.parameters.values())
+        request_param: Optional[inspect.Parameter] = next(request_params, None)
+
+        if next(request_params, None) is not None:
+            raise TypeError("The decorated view has more than one possible parameter for the AioHTTP request")
 
         if (
             request_param is None
