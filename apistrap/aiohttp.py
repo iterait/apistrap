@@ -325,7 +325,7 @@ class AioHTTPApistrap(Apistrap):
 
         takes_aiohttp_request = request_param is not None
 
-        additional_params: [inspect.Parameter] = [
+        additional_params: List[inspect.Parameter] = [
             *filter(
                 lambda p: not takes_aiohttp_request or signature.parameters[p] != request_param,
                 signature.parameters.keys(),
