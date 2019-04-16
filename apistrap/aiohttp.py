@@ -256,7 +256,10 @@ class AioHTTPApistrap(Apistrap):
     _get_ui.apistrap_ignore = True
 
     async def _process_routes(self, *args, **kwargs) -> None:
-    """Process all non-ignored routes and their parameters"""
+        """
+        Process all non-ignored routes and their parameters
+        """
+
         self._extract_specs()
 
         for route in self.app.router.routes():
@@ -312,7 +315,7 @@ class AioHTTPApistrap(Apistrap):
         )
 
         if (
-            request_param is not None
+            request_param is None
             and "request" in signature.parameters.keys()
             and signature.parameters["request"].annotation == inspect.Signature.empty
         ):
