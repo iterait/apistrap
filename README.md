@@ -72,7 +72,7 @@ oapi = AioHTTPApistrap()
 routes = web.RouteTableDef()
 
 @routes.get("/{param_a}/{param_b}")
-def endpoint(param_a: str, param_b: int):  # Note that the request parameter is optional
+def endpoint(param_a: str, param_b: int = 5):  # Note that the request parameter is optional
     return web.Response(text="Lorem ipsum")
 ```
 
