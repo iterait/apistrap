@@ -2,6 +2,7 @@ import json
 
 import pytest
 from aiohttp import web
+from aiohttp.web_request import Request
 
 from apistrap.aiohttp import AioHTTPApistrap
 
@@ -149,3 +150,24 @@ async def test_aiohttp_path_param_optional_invocation_default(aiohttp_initialize
     data = await response.json()
 
     assert data["param"] == "Default"
+
+
+async def test_aiohttp_path_param_multiple_request_parameters(aiohttp_initialized_client):
+    oapi = AioHTTPApistrap()
+
+    app = web.Application()
+    routes = web.RouteTableDef()
+    oapi.init_app(app)
+
+    with pytest.raises(TypeError):
+        @routes.get('/')
+        @routes.get('/{param}')
+        async def view(request_1: Request, request_2: Request, param: str = "Default"):
+            return web.Response(content_type="application/json", text=json.dumps({
+                "param": param,
+            }))
+
+        app.add_routes(routes)
+
+        client = await aiohttp_initialized_client(app)
+        await client.get("/spec.json")
