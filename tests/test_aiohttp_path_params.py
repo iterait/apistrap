@@ -171,3 +171,67 @@ async def test_aiohttp_path_param_multiple_request_parameters(aiohttp_initialize
 
         client = await aiohttp_initialized_client(app)
         await client.get("/spec.json")
+
+
+async def test_aiohttp_path_param_unsupported_parameter(aiohttp_initialized_client):
+    oapi = AioHTTPApistrap()
+
+    app = web.Application()
+    routes = web.RouteTableDef()
+    oapi.init_app(app)
+
+    with pytest.raises(TypeError):
+        @routes.get('/{param}')
+        async def view(param: dict):
+            return web.Response(content_type="application/json", text=json.dumps({
+                "param": param,
+            }))
+
+        app.add_routes(routes)
+
+        client = await aiohttp_initialized_client(app)
+        await client.get("/spec.json")
+
+
+@pytest.fixture(scope="function")
+def app_with_unannotated_parameter():
+    oapi = AioHTTPApistrap()
+
+    app = web.Application()
+    routes = web.RouteTableDef()
+    oapi.init_app(app)
+
+    @routes.get('/{param}')
+    async def view(param):
+        return web.Response(content_type="application/json", text=json.dumps({
+            "param": param,
+        }))
+
+    app.add_routes(routes)
+
+    yield app
+
+
+async def test_aiohttp_path_unannotated_parameter_spec(aiohttp_initialized_client, app_with_unannotated_parameter):
+    client = await aiohttp_initialized_client(app_with_unannotated_parameter)
+    response = await client.get('/spec.json')
+
+    assert response.status == 200
+    data = await response.json()
+
+    parameters = data["paths"]["/{param}"]["get"]["parameters"]
+    assert parameters == [
+        {"in": "path", "name": "param", "required": True, "schema": {"type": "string"}}
+    ]
+
+
+async def test_aiohttp_path_unannotated_parameter_arg_assignment(aiohttp_initialized_client, app_with_unannotated_parameter):
+    client = await aiohttp_initialized_client(app_with_unannotated_parameter)
+    response = await client.get("/42")
+
+    assert response.status == 200
+    data = await response.json()
+
+    assert data == {
+        "param": "42"
+    }

@@ -288,6 +288,25 @@ class AioHTTPApistrap(Apistrap):
 
             self.spec.path(url, {route.method.lower(): self._extract_operation_spec(route)})
 
+    def _check_parameter_type(self, parameter: inspect.Parameter):
+        """
+        Make sure that given parameter is annotated with a supported type
+
+        :param parameter: the parameter to check
+        :raises TypeError: on unsupported parameters
+        """
+
+        criteria = [
+            parameter.annotation == inspect.Parameter.empty,
+            parameter.annotation == str,
+            parameter.annotation == "str",
+            parameter.annotation == int,
+            parameter.annotation == "int"
+        ]
+
+        if not any(criteria):
+            raise TypeError("Unsupported parameter type")
+
     def _parse_parameter_value(self, parameter: inspect.Parameter, value: str):
         if parameter.annotation == inspect.Parameter.empty:
             return value
@@ -297,8 +316,6 @@ class AioHTTPApistrap(Apistrap):
 
         if parameter.annotation == int or parameter.annotation == "int":
             return int(value)
-
-        return value
 
     def _process_route_parameters(self, route: AbstractRoute) -> None:
         """
@@ -335,6 +352,9 @@ class AioHTTPApistrap(Apistrap):
         if not takes_aiohttp_request or additional_params:
             handler = route.handler
             accepted_path_params = set(self._get_route_parameter_names(route)).intersection(additional_params)
+
+            for param in accepted_path_params:
+                self._check_parameter_type(signature.parameters[param])
 
             async def wrapped_handler(request: Request):
                 kwargs = {
