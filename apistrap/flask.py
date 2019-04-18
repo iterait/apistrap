@@ -87,6 +87,10 @@ class FlaskApistrap(Apistrap):
             blueprint.route(self.ui_url)(self._get_ui)
             blueprint.route(self.ui_url + "/")(self._get_ui)
 
+        if self.spec_url is not None and self.redoc_url is not None:
+            blueprint.route(self.redoc_url)(self._get_redoc)
+            blueprint.route(self.redoc_url + "/")(self._get_redoc)
+
         app.register_blueprint(blueprint)
 
         if self.use_default_error_handlers:
@@ -114,6 +118,14 @@ class FlaskApistrap(Apistrap):
         return render_template("apidocs.html", apistrap=self)
 
     _get_ui.apistrap_ignore = True
+
+    def _get_redoc(self):
+        """
+        Serves ReDoc
+        """
+        return render_template("redoc.html", apistrap=self)
+
+    _get_redoc.apistrap_ignore = True
 
     def _extract_specs(self):
         """

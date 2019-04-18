@@ -94,6 +94,7 @@ class Apistrap(metaclass=ABCMeta):
         self.security_schemes: List[SecurityScheme] = []
         self._spec_url = "/spec.json"
         self._ui_url = "/apidocs"
+        self._redoc_url = None
         self._use_default_error_handlers = True
 
     def to_openapi_dict(self):
@@ -159,6 +160,19 @@ class Apistrap(metaclass=ABCMeta):
     def ui_url(self, value: Optional[str]):
         self._ensure_not_bound("You cannot change the UI url after binding the extension with an app")
         self._ui_url = value.rstrip("/") if value is not None else None
+
+    @property
+    def redoc_url(self) -> Optional[str]:
+        """
+        The URL where the extension should serve the ReDoc documentation. If it is None (or if the specification is not
+        served), the UI is not served at all.
+        """
+        return self._redoc_url
+
+    @redoc_url.setter
+    def redoc_url(self, value: Optional[str]):
+        self._ensure_not_bound("You cannot change the ReDoc url after binding the extension with an app")
+        self._redoc_url = value.rstrip("/") if value is not None else None
 
     @property
     def use_default_error_handlers(self) -> bool:
