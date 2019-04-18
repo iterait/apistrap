@@ -5,6 +5,7 @@ from typing import Callable, Dict, List, Optional, Type, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
+from docstring_parser import parse as parse_doc
 from schematics import Model
 
 from apistrap.decorators import IgnoreDecorator, IgnoreParamsDecorator, SecurityDecorator, TagsDecorator
@@ -157,27 +158,15 @@ class Apistrap(metaclass=ABCMeta):
         if docblock is None:
             return ""
 
-        lines = [*map(lambda line: line.strip(), docblock.strip().splitlines())]
-
-        if "" in lines:
-            lines = lines[: lines.index("")]
-
-        return "\n".join(lines)
+        return parse_doc(docblock).short_description
 
     def _parameters_from_docblock(self, docblock: Optional[str]) -> Dict[str, str]:
         if docblock is None:
             return {}
 
-        lines = [*map(lambda line: line.strip(), docblock.strip().splitlines())]
-        result = {}
-
-        if "" in lines:
-            for line in lines[lines.index("") :]:
-                match = re.match(r"^:param\s+([^:]+):\s+(.+)", line)
-                if match is not None:
-                    result[match.group(1)] = match.group(2)
-
-        return result
+        return {
+            param.arg_name: param.description for param in parse_doc(docblock).params if param.description.strip() != ""
+        }
 
     ############################
     # Configuration properties #

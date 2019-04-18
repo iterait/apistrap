@@ -301,7 +301,7 @@ class AioHTTPApistrap(Apistrap):
             parameter.annotation == str,
             parameter.annotation == "str",
             parameter.annotation == int,
-            parameter.annotation == "int"
+            parameter.annotation == "int",
         ]
 
         if not any(criteria):
