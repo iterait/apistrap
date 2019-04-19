@@ -223,6 +223,7 @@ class AioHTTPApistrap(Apistrap):
 
         self.app = app
         app.middlewares.append(self.error_middleware)
+        app.on_startup.append(self._process_routes)
 
         if self.spec_url is not None:
             app.router.add_route("get", self.spec_url, self._get_spec)
@@ -231,7 +232,9 @@ class AioHTTPApistrap(Apistrap):
                 for ui_url in (self.ui_url, self.ui_url + "/"):
                     app.router.add_route("get", ui_url, self._get_ui)
 
-        app.on_startup.append(self._process_routes)
+            if self.redoc_url is not None:
+                for redoc_url in (self.redoc_url, self.redoc_url + "/"):
+                    app.router.add_route("get", redoc_url, self._get_redoc)
 
     def _get_spec(self, request: Request):
         """
@@ -254,6 +257,19 @@ class AioHTTPApistrap(Apistrap):
         )
 
     _get_ui.apistrap_ignore = True
+    
+    def _get_redoc(self, request: Request):
+        """
+        Serves ReDoc
+        """
+
+        return web.Response(
+            text=self._jinja_env.get_template("redoc.html").render(apistrap=self),
+            content_type="text/html",
+            status=200,
+        )
+
+    _get_redoc.apistrap_ignore = True
 
     async def _process_routes(self, *args, **kwargs) -> None:
         """
