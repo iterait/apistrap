@@ -229,6 +229,10 @@ class AioHTTPApistrap(Apistrap):
                 for ui_url in (self.ui_url, self.ui_url + "/"):
                     app.router.add_route("get", ui_url, self._get_ui)
 
+            if self.redoc_url is not None:
+                for redoc_url in (self.redoc_url, self.redoc_url + "/"):
+                    app.router.add_route("get", redoc_url, self._get_redoc)
+
     def _get_spec(self, request: Request):
         """
         Serves the OpenAPI specification
@@ -251,6 +255,19 @@ class AioHTTPApistrap(Apistrap):
         )
 
     _get_ui.apistrap_ignore = True
+
+    def _get_redoc(self, request: Request):
+        """
+        Serves ReDoc
+        """
+
+        return web.Response(
+            text=self._jinja_env.get_template("redoc.html").render(apistrap=self),
+            content_type="text/html",
+            status=200,
+        )
+
+    _get_redoc.apistrap_ignore = True
 
     def _extract_specs(self) -> None:
         """
