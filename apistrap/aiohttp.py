@@ -257,16 +257,14 @@ class AioHTTPApistrap(Apistrap):
         )
 
     _get_ui.apistrap_ignore = True
-    
+
     def _get_redoc(self, request: Request):
         """
         Serves ReDoc
         """
 
         return web.Response(
-            text=self._jinja_env.get_template("redoc.html").render(apistrap=self),
-            content_type="text/html",
-            status=200,
+            text=self._jinja_env.get_template("redoc.html").render(apistrap=self), content_type="text/html", status=200
         )
 
     _get_redoc.apistrap_ignore = True

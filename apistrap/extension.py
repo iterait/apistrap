@@ -5,12 +5,12 @@ from typing import Callable, Dict, List, Optional, Type, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
-from docstring_parser import parse as parse_doc
 from schematics import Model
 
 from apistrap.decorators import IgnoreDecorator, IgnoreParamsDecorator, SecurityDecorator, TagsDecorator
 from apistrap.errors import ApistrapExtensionError
 from apistrap.tags import TagData
+from docstring_parser import parse as parse_doc
 
 
 class SecurityScheme(metaclass=ABCMeta):
