@@ -29,7 +29,7 @@ async def test_aiohttp_getters():
     assert oapi.description == "Description"
 
 
-async def test_aiohttp_spec_url(aiohttp_client):
+async def test_aiohttp_spec_url(aiohttp_initialized_client):
     oapi = AioHTTPApistrap()
 
     oapi.spec_url = "/myspecurl.json"
@@ -38,7 +38,7 @@ async def test_aiohttp_spec_url(aiohttp_client):
     app = web.Application()
     oapi.init_app(app)
 
-    client = await aiohttp_client(app)
+    client = await aiohttp_initialized_client(app)
     response = await client.get("/myspecurl.json")
 
     assert response.status == 200
@@ -47,7 +47,7 @@ async def test_aiohttp_spec_url(aiohttp_client):
     assert "paths" in data
 
 
-async def test_aiohttp_spec_url_reset(aiohttp_client):
+async def test_aiohttp_spec_url_reset(aiohttp_initialized_client):
     oapi = AioHTTPApistrap()
 
     oapi.spec_url = None
@@ -59,7 +59,7 @@ async def test_aiohttp_spec_url_reset(aiohttp_client):
     app = web.Application()
     oapi.init_app(app)
 
-    client = await aiohttp_client(app)
+    client = await aiohttp_initialized_client(app)
     response = await client.get("/myspecurl.json")
 
     assert response.status == 200
@@ -76,7 +76,7 @@ async def test_aiohttp_spec_url_cannot_be_set_after_init():
         oapi.spec_url = "whatever"
 
 
-async def test_aiohttp_disable_spec_url(aiohttp_client):
+async def test_aiohttp_disable_spec_url(aiohttp_initialized_client):
     oapi = AioHTTPApistrap()
 
     oapi.spec_url = None
@@ -85,12 +85,12 @@ async def test_aiohttp_disable_spec_url(aiohttp_client):
     app = web.Application()
     oapi.init_app(app)
 
-    client = await aiohttp_client(app)
+    client = await aiohttp_initialized_client(app)
     response = await client.get("/spec.json")
     assert response.status == 404
 
 
-async def test_aiohttp_disable_ui(aiohttp_client):
+async def test_aiohttp_disable_ui(aiohttp_initialized_client):
     oapi = AioHTTPApistrap()
 
     oapi.ui_url = None
@@ -99,7 +99,7 @@ async def test_aiohttp_disable_ui(aiohttp_client):
     app = web.Application()
     oapi.init_app(app)
 
-    client = await aiohttp_client(app)
+    client = await aiohttp_initialized_client(app)
     response = await client.get("/apidocs/")
     assert response.status == 404
 
@@ -112,7 +112,7 @@ async def test_aiohttp_ui_url_cannot_be_set_after_init():
         oapi.ui_url = None
 
 
-async def test_aiohttp_set_ui_url(aiohttp_client):
+async def test_aiohttp_set_ui_url(aiohttp_initialized_client):
     oapi = AioHTTPApistrap()
 
     oapi.ui_url = "/docs/"
@@ -121,7 +121,7 @@ async def test_aiohttp_set_ui_url(aiohttp_client):
     app = web.Application()
     oapi.init_app(app)
 
-    client = await aiohttp_client(app)
+    client = await aiohttp_initialized_client(app)
     response = await client.get("/docs/")
     assert response.status == 200
     response = await client.get("/docs")

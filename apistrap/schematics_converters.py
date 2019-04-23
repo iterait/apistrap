@@ -2,8 +2,16 @@ from inspect import getmro
 from typing import Any, Dict, Generator, Optional, Type
 
 from schematics import Model
-from schematics.types.base import (BaseType, BooleanType, DecimalType, FloatType, IntType, LongType, NumberType,
-                                   StringType)
+from schematics.types.base import (
+    BaseType,
+    BooleanType,
+    DecimalType,
+    FloatType,
+    IntType,
+    LongType,
+    NumberType,
+    StringType,
+)
 from schematics.types.compound import DictType, ListType, ModelType
 
 

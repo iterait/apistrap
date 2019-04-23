@@ -1,9 +1,11 @@
 import abc
+import re
 from abc import ABCMeta
 from typing import Callable, Dict, List, Optional, Type, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
+from docstring_parser import parse as parse_doc
 from schematics import Model
 
 from apistrap.decorators import IgnoreDecorator, IgnoreParamsDecorator, SecurityDecorator, TagsDecorator
@@ -86,6 +88,8 @@ class Apistrap(metaclass=ABCMeta):
     An abstract ancestor for extensions that bind Apistrap to a web framework
     """
 
+    PARAMETER_TYPE_MAP = {int: "integer", str: "string"}
+
     def __init__(self):
         self.spec = APISpec(openapi_version=OpenAPIVersion("3.0.2"), title="API created with Apistrap", version="1.0.0")
         self.description = None
@@ -109,11 +113,19 @@ class Apistrap(metaclass=ABCMeta):
 
         return result
 
+    ######################################
+    # Extension points for child classes #
+    ######################################
+
     @abc.abstractmethod
     def _is_bound(self) -> bool:
         """
         Check whether the extension is bound to an app.
         """
+
+    ###################
+    # Utility methods #
+    ###################
 
     def _ensure_not_bound(self, message: str) -> None:
         """
@@ -123,6 +135,43 @@ class Apistrap(metaclass=ABCMeta):
         """
         if self._is_bound():
             raise ApistrapExtensionError(message)
+
+    def _is_route_ignored(self, method: str, handler) -> bool:
+        """
+        Check if a view handler should be ignored.
+
+        :param method: the HTTP method
+        :param handler: the handler function
+        """
+
+        if method.lower() not in ["get", "post", "put", "delete", "patch"]:
+            return True
+
+        if getattr(handler, "apistrap_ignore", False):
+            return True
+
+        return False
+
+    def _parameter_annotation_to_openapi_type(self, annotation):
+        return self.PARAMETER_TYPE_MAP.get(annotation, "string")
+
+    def _summary_from_docblock(self, docblock: Optional[str]) -> str:
+        if docblock is None:
+            return ""
+
+        return parse_doc(docblock).short_description
+
+    def _parameters_from_docblock(self, docblock: Optional[str]) -> Dict[str, str]:
+        if docblock is None:
+            return {}
+
+        return {
+            param.arg_name: param.description for param in parse_doc(docblock).params if param.description.strip() != ""
+        }
+
+    ############################
+    # Configuration properties #
+    ############################
 
     @property
     def title(self) -> str:
@@ -185,6 +234,10 @@ class Apistrap(metaclass=ABCMeta):
     def use_default_error_handlers(self, value: bool):
         self._ensure_not_bound("You cannot change the error handler settings after binding the extension with an app")
         self._use_default_error_handlers = value
+
+    ###################################
+    # Component definition management #
+    ###################################
 
     def add_request_definition(self, name: str, schema: dict):
         """
@@ -262,6 +315,10 @@ class Apistrap(metaclass=ABCMeta):
         spec = self.spec.to_dict()
         if "tags" not in spec or tag.name not in map(lambda t: t["name"], spec["tags"]):
             self.spec.tag(tag.to_dict())
+
+    #######################
+    # Decorator factories #
+    #######################
 
     def tags(self, *tags: Union[str, TagData]) -> TagsDecorator:
         """

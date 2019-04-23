@@ -64,8 +64,6 @@ class FlaskAcceptsDecorator(AcceptsDecorator):
 
 
 class FlaskApistrap(Apistrap):
-    PARAMETER_TYPE_MAP = {int: "integer", str: "string"}
-
     def __init__(self):
         super().__init__()
         self._app: Flask = None
@@ -141,16 +139,12 @@ class FlaskApistrap(Apistrap):
 
             handler = self._app.view_functions[rule.endpoint]
 
-            # Skip ignored endpoints
-            if getattr(handler, "apistrap_ignore", False):
-                continue
-
             url = str(rule)
             for arg in re.findall("(<([^<>]*:)?([^<>]*)>)", url):
                 url = url.replace(arg[0], "{%s}" % arg[2])
 
             for method in rule.methods:
-                if method.lower() not in ["get", "post", "put", "delete", "patch"]:
+                if self._is_route_ignored(method, handler):
                     continue
 
                 self.spec.path(url, {method.lower(): self._extract_operation_specs(handler)})
@@ -166,10 +160,12 @@ class FlaskApistrap(Apistrap):
         """
 
         specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
-        specs_dict["summary"] = handler.__doc__.strip() if handler.__doc__ else ""
+        specs_dict["summary"] = self._summary_from_docblock(handler.__doc__)
+        specs_dict["operationId"] = snake_to_camel(handler.__name__)
 
         signature = inspect.signature(handler)
         ignored = getattr(handler, "_ignored_params", [])
+        param_doc = self._parameters_from_docblock(handler.__doc__)
 
         for arg in signature.parameters.values():
             if arg.name not in ignored:
@@ -177,12 +173,13 @@ class FlaskApistrap(Apistrap):
                     "in": "path",
                     "name": arg.name,
                     "required": True,
-                    "schema": {"type": self.PARAMETER_TYPE_MAP.get(arg.annotation, "string")},
+                    "schema": {"type": self._parameter_annotation_to_openapi_type(arg.annotation)},
                 }
 
-                specs_dict["parameters"].append(param_data)
+                if arg.name in param_doc.keys():
+                    param_data["description"] = param_doc[arg.name]
 
-        specs_dict["operationId"] = snake_to_camel(handler.__name__)
+                specs_dict["parameters"].append(param_data)
 
         return specs_dict
 
