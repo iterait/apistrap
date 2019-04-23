@@ -1,6 +1,8 @@
 # Apistrap - HTTP API utilities
 
-[![CircleCI](https://circleci.com/gh/iterait/apistrap.png?style=shield&circle-token=6e0633d5636dd5b858dd4db501695e10b16f373f)](https://circleci.com/gh/iterait/apistrap/tree/master)
+[![CircleCI](https://circleci.com/gh/iterait/apistrap.png?style=shield&circle-token=6e0633d5636dd5b858dd4db501695e10b16f373f)](https://circleci.com/gh/iterait/apistrap/tree/dev)
+[![Coverage](https://img.shields.io/coveralls/github/iterait/apistrap.svg)](https://coveralls.io/github/iterait/apistrap)
+[![PyPi](https://img.shields.io/pypi/v/apistrap.svg)](https://pypi.org/project/apistrap/)
 [![Development Status](https://img.shields.io/badge/status-Regular-brightgreen.svg?style=flat)]()
 [![Master Developer](https://img.shields.io/badge/master-Jan%20Buchar-lightgrey.svg?style=flat)]()
 
@@ -59,6 +61,20 @@ web.run_app(app)
 
 Please note that this is very similar to how Apistrap works with Flask. All decorators that work with Flask routes work
 the same with AioHTTP web routes. Also, you still have to put the route decorators on top.
+
+We also make it possible to read route parameters using function parameters like you would with Flask:
+
+```python
+from aiohttp import web
+from apistrap.aiohttp import AioHTTPApistrap
+
+oapi = AioHTTPApistrap()
+routes = web.RouteTableDef()
+
+@routes.get("/{param_a}/{param_b}")
+def endpoint(param_a: str, param_b: int = 5):  # Note that the request parameter is optional
+    return web.Response(text="Lorem ipsum")
+```
 
 ### Request Body Parsing
 

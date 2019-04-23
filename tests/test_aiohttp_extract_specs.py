@@ -6,7 +6,7 @@ from aiohttp import web
 from apistrap.aiohttp import AioHTTPApistrap
 
 
-async def test_aiohttp_spec_url_repeated_call(aiohttp_client):
+async def test_aiohttp_spec_url_repeated_call(aiohttp_initialized_client):
     oapi = AioHTTPApistrap()
 
     app = web.Application()
@@ -21,7 +21,7 @@ async def test_aiohttp_spec_url_repeated_call(aiohttp_client):
 
     app.add_routes(routes)
 
-    client = await aiohttp_client(app)
+    client = await aiohttp_initialized_client(app)
     response = await client.get('/spec.json')
 
     assert response.status == 200
@@ -36,7 +36,7 @@ async def test_aiohttp_spec_url_repeated_call(aiohttp_client):
     assert new_data == data
 
 
-async def test_aiohttp_spec_url_weird_method(aiohttp_client):
+async def test_aiohttp_spec_url_weird_method(aiohttp_initialized_client):
     oapi = AioHTTPApistrap()
 
     app = web.Application()
@@ -52,7 +52,7 @@ async def test_aiohttp_spec_url_weird_method(aiohttp_client):
 
     app.add_routes(routes)
 
-    client = await aiohttp_client(app)
+    client = await aiohttp_initialized_client(app)
     response = await client.get('/spec.json')
 
     assert response.status == 200
@@ -62,7 +62,7 @@ async def test_aiohttp_spec_url_weird_method(aiohttp_client):
     assert 'options' not in data['paths']['/']
 
 
-async def test_aiohttp_spec_url_with_params(aiohttp_client):
+async def test_aiohttp_spec_url_with_params(aiohttp_initialized_client):
     oapi = AioHTTPApistrap()
 
     app = web.Application()
@@ -77,7 +77,7 @@ async def test_aiohttp_spec_url_with_params(aiohttp_client):
 
     app.add_routes(routes)
 
-    client = await aiohttp_client(app)
+    client = await aiohttp_initialized_client(app)
     response = await client.get('/spec.json')
 
     assert response.status == 200
@@ -86,7 +86,7 @@ async def test_aiohttp_spec_url_with_params(aiohttp_client):
     assert data['paths']['/{param}/']['get']['parameters'][0]['name'] == 'param'
 
 
-async def test_aiohttp_spec_url_ignore_endpoint(aiohttp_client):
+async def test_aiohttp_spec_url_ignore_endpoint(aiohttp_initialized_client):
     oapi = AioHTTPApistrap()
 
     app = web.Application()
@@ -102,7 +102,7 @@ async def test_aiohttp_spec_url_ignore_endpoint(aiohttp_client):
 
     app.add_routes(routes)
 
-    client = await aiohttp_client(app)
+    client = await aiohttp_initialized_client(app)
     response = await client.get('/spec.json')
 
     assert response.status == 200

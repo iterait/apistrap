@@ -1,4 +1,5 @@
 import pytest
+from aiohttp.web_app import Application
 from flask import Flask
 from pytest_mock import MockFixture
 
@@ -23,6 +24,16 @@ def flask_apistrap(app):
     apistrap = FlaskApistrap()
     apistrap.init_app(app)
     yield apistrap
+
+
+@pytest.fixture()
+def aiohttp_initialized_client(aiohttp_client):
+    async def func(app: Application):
+        app.freeze()
+        await app.startup()
+        return await aiohttp_client(app)
+
+    yield func
 
 
 @pytest.fixture()
