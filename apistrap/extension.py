@@ -364,3 +364,8 @@ class Apistrap(metaclass=ABCMeta):
         A decorator that validates request bodies against a schema and passes it as an argument to the view function.
         The destination argument must be annotated with the request type.
         """
+
+    def accepts_file(self, mime_type: str = None):
+        """
+        A decorator used to declare that an endpoint accepts a file as the request body.
+        """
