@@ -261,14 +261,7 @@ class AcceptsFileDecorator:
         _ensure_specs_dict(wrapped_func)
 
         wrapped_func.specs_dict["requestBody"] = {
-            "content": {
-                self.mime_type: {
-                    "schema": {
-                        "type": "string",
-                        "format": "binary"
-                    }
-                }
-            },
+            "content": {self.mime_type: {"schema": {"type": "string", "format": "binary"}}},
             "required": True,
         }
 
