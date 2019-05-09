@@ -249,6 +249,25 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
         """
 
 
+class AcceptsFileDecorator:
+    """
+    A decorator used to declare that an endpoint accepts a file upload in the request body.
+    """
+
+    def __init__(self, mime_type: str = None):
+        self.mime_type = mime_type or "application/octet-stream"
+
+    def __call__(self, wrapped_func: Callable):
+        _ensure_specs_dict(wrapped_func)
+
+        wrapped_func.specs_dict["requestBody"] = {
+            "content": {self.mime_type: {"schema": {"type": "string", "format": "binary"}}},
+            "required": True,
+        }
+
+        return wrapped_func
+
+
 class IgnoreDecorator:
     """
     A decorator that marks an endpoint as ignored so that the extension won't include it in the specification.

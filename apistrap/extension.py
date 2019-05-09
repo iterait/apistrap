@@ -1,16 +1,21 @@
 import abc
-import re
 from abc import ABCMeta
 from typing import Callable, Dict, List, Optional, Type, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
+from docstring_parser import parse as parse_doc
 from schematics import Model
 
-from apistrap.decorators import IgnoreDecorator, IgnoreParamsDecorator, SecurityDecorator, TagsDecorator
+from apistrap.decorators import (
+    AcceptsFileDecorator,
+    IgnoreDecorator,
+    IgnoreParamsDecorator,
+    SecurityDecorator,
+    TagsDecorator,
+)
 from apistrap.errors import ApistrapExtensionError
 from apistrap.tags import TagData
-from docstring_parser import parse as parse_doc
 
 
 class SecurityScheme(metaclass=ABCMeta):
@@ -364,3 +369,9 @@ class Apistrap(metaclass=ABCMeta):
         A decorator that validates request bodies against a schema and passes it as an argument to the view function.
         The destination argument must be annotated with the request type.
         """
+
+    def accepts_file(self, mime_type: str = None):
+        """
+        A decorator used to declare that an endpoint accepts a file as the request body.
+        """
+        return AcceptsFileDecorator(mime_type)
