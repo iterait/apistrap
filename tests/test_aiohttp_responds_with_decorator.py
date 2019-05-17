@@ -1,10 +1,12 @@
 import contextlib
 import io
 import json
+import re
 from unittest import mock
 
 import pytest
-from aiohttp import web
+from aiohttp import ClientSession, web
+from aiohttp.web_request import Request
 from schematics import Model
 from schematics.types import IntType, StringType
 
@@ -111,6 +113,14 @@ def app_with_responds_with(aiohttp_apistrap, tmpdir):
                             attachment_filename='hello.txt',
                             last_modified=2018)
 
+    @routes.get("/file_stream")
+    @aiohttp_apistrap.responds_with(FileResponse)
+    async def get_stream_file(request: Request):
+        session = ClientSession()
+
+        response = await session.get("https://api.ipify.org")
+        return FileResponse(filename_or_fp=response.content)
+
     app.add_routes(routes)
     aiohttp_apistrap.use_default_error_handlers = False
     aiohttp_apistrap.init_app(app)
@@ -203,3 +213,11 @@ async def test_file_response_timestamp(aiohttp_initialized_client, app_with_resp
     response = await client.get('/file_timestamp')
     assert await response.read() == b'hello'
     assert response.headers['Last-Modified'] == '2018'
+
+
+async def test_file_stream(aiohttp_initialized_client, app_with_responds_with):
+    client = await aiohttp_initialized_client(app_with_responds_with)
+    response = await client.get('/file_stream')
+
+    data = await response.read()
+    assert re.match(r"^\d+\.\d+\.\d+\.\d+", data.decode()) is not None
