@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Coroutine, List, Optional, Tuple, Type
 
 import jinja2
-from aiohttp import web
+from aiohttp import StreamReader, web
 from aiohttp.web_exceptions import HTTPError
 from aiohttp.web_request import BaseRequest, Request
 from aiohttp.web_response import Response
@@ -60,9 +60,14 @@ class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
                     raise TypeError("No request passed to view function")
 
                 await stream.prepare(request)
+                buffer_size = 16536
 
                 while True:
-                    chunk = response.filename_or_fp.read(16536)
+                    if isinstance(response.filename_or_fp, StreamReader):
+                        chunk = await response.filename_or_fp.read(buffer_size)
+                    else:
+                        chunk = response.filename_or_fp.read(buffer_size)
+
                     if not chunk:
                         await stream.write_eof()
                         break

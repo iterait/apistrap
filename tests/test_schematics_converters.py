@@ -221,3 +221,20 @@ def test_schematics_to_schema_object_descriptions():
         'title': 'ModelWithDescriptions',
         'type': 'object'
     }
+
+
+class ModelWithEnum(Model):
+    enum_field = StringType(choices=["member_a", "member_b"])
+
+
+def test_enum():
+    assert schematics_model_to_schema_object(ModelWithEnum) == {
+        "title": "ModelWithEnum",
+        "type": "object",
+        "properties": {
+            "enum_field": {
+                "type": "string",
+                "enum": ["member_a", "member_b"]
+            }
+        }
+    }
