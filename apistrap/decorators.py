@@ -97,15 +97,7 @@ class RespondsWithDecorator:
         else:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
                 "description": self._description or self._response_class.__name__,
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "$ref": self._apistrap.add_schema_definition(
-                                self._response_class.__name__, self._get_schema_object()
-                            )
-                        }
-                    }
-                },
+                "content": {"application/json": {"schema": self._get_schema_object()}},
             }
 
             if issubclass(self._response_class, ExamplesMixin):
@@ -136,7 +128,7 @@ class RespondsWithDecorator:
         return wrapper
 
     def _get_schema_object(self):
-        return schematics_model_to_schema_object(self._response_class)
+        return schematics_model_to_schema_object(self._response_class, self._apistrap)
 
     def _process_response(self, response, is_last_decorator: bool, *args, **kwargs):
         """
@@ -172,13 +164,7 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
         # TODO parse title from param in docblock
         wrapped_func.specs_dict["requestBody"] = {
             "content": {
-                "application/json": {
-                    "schema": {
-                        "$ref": self._apistrap.add_request_definition(
-                            self._request_class.__name__, schematics_model_to_schema_object(self._request_class)
-                        )
-                    }
-                }
+                "application/json": {"schema": schematics_model_to_schema_object(self._request_class, self._apistrap)}
             },
             "required": True,
         }
