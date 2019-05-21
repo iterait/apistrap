@@ -16,6 +16,8 @@ from schematics.types.base import (
 )
 from schematics.types.compound import DictType, ListType, ModelType
 
+from apistrap.utils import snake_to_camel
+
 if TYPE_CHECKING:
     from apistrap.extension import Apistrap
 
@@ -72,7 +74,7 @@ def _field_to_schema_object(field: BaseType, apistrap: Optional[Apistrap]) -> Op
         elif isinstance(field.field, BaseType):
             return _primitive_dict_to_schema_object(field)
     elif isinstance(field, StringType):
-        return _string_field_to_schema_object(field)
+        return _string_field_to_schema_object(field, apistrap)
     elif isinstance(field, BaseType):
         return _primitive_field_to_schema_object(field)
 
@@ -141,11 +143,17 @@ def _primitive_field_to_schema_object(field: BaseType) -> Dict[str, str]:
     return schema
 
 
-def _string_field_to_schema_object(field: StringType) -> Dict[str, str]:
+def _string_field_to_schema_object(field: StringType, apistrap: Optional[Apistrap] = None) -> Dict[str, str]:
     schema = _primitive_field_to_schema_object(field)
 
     if field.choices is not None:
-        schema["enum"] = field.choices
+        if apistrap is None:
+            schema["enum"] = field.choices
+        else:
+            name = snake_to_camel(field.name)
+            name = name[0].upper() + name[1:]
+
+            schema = {"$ref": apistrap.add_schema_definition(name, {"type": "string", "enum": field.choices})}
 
     return schema
 
