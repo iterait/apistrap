@@ -1,10 +1,20 @@
+from __future__ import annotations
+
 from datetime import datetime
 from io import BytesIO
-from typing import Union
+from typing import TYPE_CHECKING, Union
 from typing.io import BinaryIO
 
 from schematics.exceptions import BaseError, CompoundError, ValidationError
 from schematics.types import FloatType, ListType
+
+if TYPE_CHECKING:
+    try:
+        from aiohttp import StreamReader
+    except ImportError:
+
+        class StreamReader:
+            pass
 
 
 class FileResponse:
@@ -15,7 +25,7 @@ class FileResponse:
 
     def __init__(
         self,
-        filename_or_fp: Union[str, BinaryIO, BytesIO],
+        filename_or_fp: Union[str, BinaryIO, BytesIO, StreamReader],
         as_attachment: bool = False,
         attachment_filename: str = None,
         add_etags: bool = True,
