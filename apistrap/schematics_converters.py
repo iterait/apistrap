@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from inspect import getmro
-from typing import Any, Dict, Generator, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, Generator, Optional, Type
 
 from schematics import Model
 from schematics.types.base import (
@@ -14,6 +16,11 @@ from schematics.types.base import (
 )
 from schematics.types.compound import DictType, ListType, ModelType
 
+from apistrap.utils import snake_to_camel
+
+if TYPE_CHECKING:
+    from apistrap.extension import Apistrap
+
 
 def _get_serialized_name(field: BaseType) -> str:
     """
@@ -25,18 +32,19 @@ def _get_serialized_name(field: BaseType) -> str:
     return getattr(field, "serialized_name", None) or field.name
 
 
-def _model_fields_to_schema_object_properties(model: Type[Model]) -> Dict[str, Any]:
+def _model_fields_to_schema_object_properties(model: Type[Model], apistrap: Optional[Apistrap]) -> Dict[str, Any]:
     """
     Convert all fields of a model to OpenAPI 3 SchemaObject Properties objects
 
     :param model: the model to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
     :return: a dictionary with field names as keys and SchemaObjects as values
     """
     properties = {}
 
     for field in model._fields.values():
         serialized_name = _get_serialized_name(field)
-        schema_object = _field_to_schema_object(field)
+        schema_object = _field_to_schema_object(field, apistrap)
 
         if schema_object is not None:
             properties[serialized_name] = schema_object
@@ -44,28 +52,29 @@ def _model_fields_to_schema_object_properties(model: Type[Model]) -> Dict[str, A
     return properties
 
 
-def _field_to_schema_object(field: BaseType) -> Optional[Dict[str, Any]]:
+def _field_to_schema_object(field: BaseType, apistrap: Optional[Apistrap]) -> Optional[Dict[str, Any]]:
     """
     Convert a field definition to OpenAPI 3 schema.
 
     :param field: the field to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
     :return: a schema
     """
 
     if isinstance(field, ModelType):
-        return _model_field_to_schema_object(field)
+        return _model_field_to_schema_object(field, apistrap)
     elif isinstance(field, ListType):
         if isinstance(field.field, ModelType):
-            return _model_array_to_schema_object(field)
+            return _model_array_to_schema_object(field, apistrap)
         elif isinstance(field.field, BaseType):
             return _primitive_array_to_schema_object(field)
     elif isinstance(field, DictType):
         if isinstance(field.field, ModelType):
-            return _model_dict_to_schema_object(field)
+            return _model_dict_to_schema_object(field, apistrap)
         elif isinstance(field.field, BaseType):
             return _primitive_dict_to_schema_object(field)
     elif isinstance(field, StringType):
-        return _string_field_to_schema_object(field)
+        return _string_field_to_schema_object(field, apistrap)
     elif isinstance(field, BaseType):
         return _primitive_field_to_schema_object(field)
 
@@ -134,11 +143,17 @@ def _primitive_field_to_schema_object(field: BaseType) -> Dict[str, str]:
     return schema
 
 
-def _string_field_to_schema_object(field: StringType) -> Dict[str, str]:
+def _string_field_to_schema_object(field: StringType, apistrap: Optional[Apistrap] = None) -> Dict[str, str]:
     schema = _primitive_field_to_schema_object(field)
 
     if field.choices is not None:
-        schema["enum"] = field.choices
+        if apistrap is None:
+            schema["enum"] = field.choices
+        else:
+            name = snake_to_camel(field.name)
+            name = name[0].upper() + name[1:]
+
+            schema = {"$ref": apistrap.add_schema_definition(name, {"type": "string", "enum": field.choices})}
 
     return schema
 
@@ -156,28 +171,34 @@ def _get_required_fields(model: Type[Model]) -> Generator[str, None, None]:
             yield _get_serialized_name(field)
 
 
-def _model_array_to_schema_object(field: ModelType) -> Dict[str, Any]:
+def _model_array_to_schema_object(field: ModelType, apistrap: Optional[Apistrap]) -> Dict[str, Any]:
     """
     Get a SchemaObject for a list of given models
 
     :param field: the field field to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
     :return: a SchemaObject
     """
 
     model = field.field.model_class
 
-    schema = {"type": "array", "title": f"List of {model.__name__}", "items": schematics_model_to_schema_object(model)}
+    schema = {
+        "type": "array",
+        "title": f"List of {model.__name__}",
+        "items": schematics_model_to_schema_object(model, apistrap),
+    }
 
     schema.update(_extract_model_description(field))
 
     return schema
 
 
-def _model_dict_to_schema_object(field: DictType) -> Dict[str, Any]:
+def _model_dict_to_schema_object(field: DictType, apistrap: Optional[Apistrap]) -> Dict[str, Any]:
     """
     Get a SchemaObject for a dictionary of given models
 
     :param field: the field to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
     :return: a SchemaObject
     """
 
@@ -186,7 +207,7 @@ def _model_dict_to_schema_object(field: DictType) -> Dict[str, Any]:
     schema = {
         "type": "object",
         "title": f"Dictionary of {model.__name__}",
-        "additionalProperties": schematics_model_to_schema_object(model),
+        "additionalProperties": schematics_model_to_schema_object(model, apistrap),
     }
 
     schema.update(_extract_model_description(field))
@@ -205,7 +226,7 @@ def _primitive_array_to_schema_object(field: ListType) -> Dict[str, Any]:
     schema = {
         "type": "array",
         "title": f"List of {field.field.__class__.__name__}",
-        "items": _field_to_schema_object(field.field),
+        "items": _field_to_schema_object(field.field, None),
     }
 
     schema.update(_extract_model_description(field))
@@ -224,7 +245,7 @@ def _primitive_dict_to_schema_object(field: DictType) -> Dict[str, Any]:
     schema = {
         "type": "object",
         "title": f"Dictionary of {field.field.__class__.__name__}",
-        "additionalProperties": _field_to_schema_object(field.field),
+        "additionalProperties": _field_to_schema_object(field.field, None),
     }
 
     schema.update(_extract_model_description(field))
@@ -232,31 +253,34 @@ def _primitive_dict_to_schema_object(field: DictType) -> Dict[str, Any]:
     return schema
 
 
-def _model_field_to_schema_object(field: ModelType) -> Dict[str, Any]:
+def _model_field_to_schema_object(field: ModelType, apistrap: Optional[Apistrap]) -> Dict[str, Any]:
     """
     Get a SchemaObject for a model field.
 
     :param field: the field that determines the value type
+    :param apistrap: the extension used for adding reusable schema definitions
     :return: a SchemaObject
     """
 
-    schema = schematics_model_to_schema_object(field.model_class)
+    schema = schematics_model_to_schema_object(field.model_class, apistrap)
     schema.update(_extract_model_description(field))
 
     return schema
 
 
-def schematics_model_to_schema_object(model: Type[Model]) -> Dict[str, Any]:
+def schematics_model_to_schema_object(model: Type[Model], apistrap: Optional[Apistrap] = None) -> Dict[str, Any]:
     """
     Convert a Schematics model to an OpenAPI 3 SchemaObject
 
     :param model: the model to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
     :return: a SchemaObject
     """
+
     schema = {
         "type": "object",
         "title": model.__name__,
-        "properties": (_model_fields_to_schema_object_properties(model)),
+        "properties": (_model_fields_to_schema_object_properties(model, apistrap)),
     }
 
     required = list(_get_required_fields(model))
@@ -264,4 +288,9 @@ def schematics_model_to_schema_object(model: Type[Model]) -> Dict[str, Any]:
     if required:
         schema["required"] = required
 
-    return schema
+    if apistrap is None:
+        return schema  # There is no way to reuse the schema definition
+
+    name = apistrap.add_schema_definition(model.__name__, schema)
+
+    return {"$ref": name}
