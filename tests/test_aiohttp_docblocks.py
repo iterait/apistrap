@@ -28,6 +28,14 @@ def app_with_params_as_args():
             "b": param_b
         }))
 
+    @routes.get('/extended')
+    async def view_extended():
+        """
+        A summary.
+
+        An extended description.
+        """
+
     app.add_routes(routes)
 
     yield app
@@ -57,3 +65,15 @@ async def test_parameters_from_docblock(app_with_params_as_args, aiohttp_initial
 
     assert param_a["description"] == "Parameter A"
     assert param_b["description"] == "Parameter B"
+
+
+async def test_extended_description_from_docblock(app_with_params_as_args, aiohttp_initialized_client):
+    client = await aiohttp_initialized_client(app_with_params_as_args)
+    response = await client.get("/spec.json")
+
+    assert response.status == 200
+    data = await response.json()
+    path = data["paths"]["/extended"]["get"]
+
+    assert path["summary"] == "A summary."
+    assert path["description"] == "An extended description."

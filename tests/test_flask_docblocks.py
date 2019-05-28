@@ -18,6 +18,14 @@ def app_with_params_as_args(app, flask_apistrap):
             "b": param_b
         })
 
+    @app.route('/extended', methods=["get"])
+    def view_extended():
+        """
+        A summary.
+
+        An extended description.
+        """
+
     yield app
 
 
@@ -41,3 +49,13 @@ def test_parameters_from_docblock(app_with_params_as_args, client):
 
     assert param_a["description"] == "Parameter A"
     assert param_b["description"] == "Parameter B"
+
+
+def test_extended_description_from_docblock(app_with_params_as_args, client):
+    response = client.get("/spec.json")
+
+    assert response.status_code == 200
+    path = response.json["paths"]["/extended"]["get"]
+
+    assert path["summary"] == "A summary."
+    assert path["description"] == "An extended description."
