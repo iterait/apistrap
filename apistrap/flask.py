@@ -160,7 +160,9 @@ class FlaskApistrap(Apistrap):
         """
 
         specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
-        specs_dict["summary"] = self._summary_from_docblock(handler.__doc__)
+
+        self._descriptions_from_docblock(handler.__doc__, specs_dict)
+
         specs_dict["operationId"] = snake_to_camel(handler.__name__)
 
         signature = inspect.signature(handler)

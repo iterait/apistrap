@@ -403,8 +403,9 @@ class AioHTTPApistrap(Apistrap):
         handler = getattr(route.handler, self.SYNTHETIC_WRAPPER_ATTR, route.handler)
 
         specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
-        specs_dict["summary"] = self._summary_from_docblock(handler.__doc__)
         specs_dict["operationId"] = snake_to_camel(handler.__name__)
+
+        self._descriptions_from_docblock(handler.__doc__, specs_dict)
 
         signature = inspect.signature(handler)
         param_doc = self._parameters_from_docblock(handler.__doc__)

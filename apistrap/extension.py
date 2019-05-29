@@ -160,19 +160,20 @@ class Apistrap(metaclass=ABCMeta):
     def _parameter_annotation_to_openapi_type(self, annotation):
         return self.PARAMETER_TYPE_MAP.get(annotation, "string")
 
-    def _summary_from_docblock(self, docblock: Optional[str]) -> str:
-        if docblock is None:
-            return ""
-
-        return parse_doc(docblock).short_description
-
     def _parameters_from_docblock(self, docblock: Optional[str]) -> Dict[str, str]:
-        if docblock is None:
-            return {}
 
         return {
             param.arg_name: param.description for param in parse_doc(docblock).params if param.description.strip() != ""
         }
+
+    def _descriptions_from_docblock(self, docblock: Optional[str], target: dict):
+        if docblock is None:
+            return {}
+
+        parsed = parse_doc(docblock)
+
+        target["summary"] = parsed.short_description
+        target["description"] = parsed.long_description
 
     ############################
     # Configuration properties #
