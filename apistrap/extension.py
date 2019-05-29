@@ -1,6 +1,7 @@
 import abc
 from abc import ABCMeta
-from typing import Callable, Dict, List, Optional, Type, Union
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional, Type, Union, TypeVar
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
@@ -15,6 +16,7 @@ from apistrap.decorators import (
     TagsDecorator,
 )
 from apistrap.errors import ApistrapExtensionError
+from apistrap.schemas import ErrorResponse
 from apistrap.tags import TagData
 
 
@@ -88,6 +90,16 @@ class OAuthSecurity(SecurityScheme):
         return {"type": "oauth2", "flows": {flow.flow_type: flow.to_openapi_dict() for flow in self.flows}}
 
 
+ExceptionType = TypeVar("ExceptionType", bound=Exception)
+
+
+@dataclass
+class ErrorHandler:
+    exception_class: Type[Exception]
+    http_code: int
+    handler: Callable[[Exception], ErrorResponse]
+
+
 class Apistrap(metaclass=ABCMeta):
     """
     An abstract ancestor for extensions that bind Apistrap to a web framework
@@ -105,6 +117,7 @@ class Apistrap(metaclass=ABCMeta):
         self._ui_url = "/apidocs"
         self._redoc_url = None
         self._use_default_error_handlers = True
+        self._error_handlers: List[ErrorHandler] = []
 
     def to_openapi_dict(self):
         """
@@ -175,6 +188,13 @@ class Apistrap(metaclass=ABCMeta):
         target["summary"] = parsed.short_description
         target["description"] = parsed.long_description
 
+    def exception_to_http_code(self, exception_class: Type[Exception]) -> Optional[int]:
+        for handler in self._error_handlers:
+            if issubclass(exception_class, handler.exception_class):
+                return handler.http_code
+
+        return None
+
     ############################
     # Configuration properties #
     ############################
@@ -240,6 +260,15 @@ class Apistrap(metaclass=ABCMeta):
     def use_default_error_handlers(self, value: bool):
         self._ensure_not_bound("You cannot change the error handler settings after binding the extension with an app")
         self._use_default_error_handlers = value
+
+    def add_error_handler(
+            self, exception_class: Type[ExceptionType], http_code: int, handler: Callable[[ExceptionType], ErrorResponse]
+    ) -> None:
+        """
+        Add an error handler function.
+        """
+
+        self._error_handlers.append(ErrorHandler(exception_class, http_code, handler))
 
     ###################################
     # Component definition management #
