@@ -13,6 +13,7 @@ from apistrap.examples import ExamplesMixin, model_examples_to_openapi_dict
 from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.tags import TagData
 from apistrap.types import FileResponse
+from apistrap.utils import get_type_hints
 
 if TYPE_CHECKING:
     from apistrap.extension import Apistrap
@@ -148,14 +149,10 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
         self._apistrap = apistrap
         self._request_class = request_class
 
-    def _find_parameter_by_request_class(self, signature: inspect.Signature) -> Optional[inspect.Parameter]:
-        for parameter in signature.parameters.values():
-            if isinstance(parameter.annotation, str):
-                if parameter.annotation == self._request_class.__qualname__:
-                    return parameter
-            elif isinstance(parameter.annotation, type):
-                if issubclass(self._request_class, parameter.annotation):
-                    return parameter
+    def _find_parameter_by_request_class(self, handler) -> Optional[str]:
+        for name, annotation in get_type_hints(_get_wrapped_function(handler)).items():
+            if issubclass(self._request_class, annotation):
+                return name
         return None
 
     def __call__(self, wrapped_func: Callable):
@@ -178,7 +175,7 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
         wrapped_func.specs_dict["x-codegen-request-body-name"] = "body"
 
         signature = inspect.signature(wrapped_func)
-        request_arg = self._find_parameter_by_request_class(signature)
+        request_arg = self._find_parameter_by_request_class(wrapped_func)
 
         if request_arg is None:
             raise TypeError(f"no argument of type `{self._request_class}` found")
@@ -201,16 +198,16 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
                 kwargs = self._process_request_kwargs(body, signature, request_arg, *args, **kwargs)
                 return wrapped_func(*args, **kwargs)
 
-        _add_ignored_param(wrapper, request_arg.name)
+        _add_ignored_param(wrapper, request_arg)
         return wrapper
 
     def _check_request_type(self, *args, **kwargs):
         if self._get_request_content_type(*args, **kwargs) != "application/json":
             raise ApiClientError("Unsupported media type, JSON is expected")
 
-    def _process_request_kwargs(self, body, signature, request_arg, *args, **kwargs):
+    def _process_request_kwargs(self, body, signature, request_arg: str, *args, **kwargs):
         bound_args = signature.bind_partial(*args, **kwargs)
-        if request_arg.name not in bound_args.arguments:
+        if request_arg not in bound_args.arguments:
             request_object = self._request_class.__new__(self._request_class)
 
             try:
@@ -218,7 +215,7 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
             except DataError as e:
                 raise InvalidFieldsError(e.errors) from e
 
-            new_kwargs = {request_arg.name: request_object}
+            new_kwargs = {request_arg: request_object}
             new_kwargs.update(**kwargs)
             return new_kwargs
 
