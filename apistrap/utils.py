@@ -1,7 +1,36 @@
 import traceback
-from typing import Any, Mapping
+from typing import Any, Callable, Generator, Mapping
 
 from more_itertools import flatten
+
+
+def get_wrapped_function(func: Callable):
+    """
+    Get the actual function from a decorated function. This could end up in a loop on horribly mangled functions.
+    """
+
+    wrapped = getattr(func, "__wrapped__", None)
+
+    if wrapped is None:
+        return func
+
+    return get_wrapped_function(wrapped)
+
+
+def unwrap_function(func: Callable) -> Generator[Callable, None, None]:
+    """
+    Gradually unwrap a decorated function. The first yielded item is always the arguments and the last one is always the
+    first function that is not a wrapper.
+    """
+
+    cursor = func
+
+    while True:
+        yield cursor
+        cursor = getattr(cursor, "__wrapped__", None)
+
+        if cursor is None:
+            break
 
 
 def format_exception(exception: Exception) -> Mapping[str, Any]:

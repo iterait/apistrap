@@ -13,6 +13,7 @@ from apistrap.examples import ExamplesMixin, model_examples_to_openapi_dict
 from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.tags import TagData
 from apistrap.types import FileResponse
+from apistrap.utils import get_wrapped_function
 
 if TYPE_CHECKING:
     from apistrap.extension import Apistrap
@@ -28,19 +29,6 @@ def _add_ignored_param(func: Callable, arg: str):
         setattr(func, "_ignored_params", [])
 
     func._ignored_params.append(arg)
-
-
-def _get_wrapped_function(func: Callable):
-    """
-    Get the actual function from a decorated function. This could end up in a loop on horribly mangled functions.
-    """
-
-    wrapped = getattr(func, "__wrapped__", None)
-
-    if wrapped is None:
-        return func
-
-    return _get_wrapped_function(wrapped)
 
 
 class IgnoreParamsDecorator:
@@ -86,6 +74,7 @@ class RespondsWithDecorator:
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
+        wrapped_func = self._apistrap.pre_decorate(wrapped_func)
 
         if self._response_class == FileResponse:
             wrapped_func.specs_dict["responses"][str(self._code)] = {
@@ -106,7 +95,7 @@ class RespondsWithDecorator:
                     model_examples_to_openapi_dict(self._response_class)
                 # fmt: on
 
-        innermost_func = _get_wrapped_function(wrapped_func)
+        innermost_func = get_wrapped_function(wrapped_func)
         self.outermost_decorators[innermost_func] = self
 
         if inspect.iscoroutinefunction(wrapped_func):
@@ -160,6 +149,7 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
+        wrapped_func = self._apistrap.pre_decorate(wrapped_func)
 
         # TODO parse title from param in docblock
         wrapped_func.specs_dict["requestBody"] = {
@@ -189,7 +179,7 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
             async def wrapper(*args, **kwargs):
                 self._check_request_type(*args, **kwargs)
                 body = await self._get_request_json(*args, **kwargs)
-                kwargs = self._process_request_kwargs(body, signature, request_arg, *args, **kwargs)
+                args, kwargs = self._process_request_args(body, signature, request_arg, *args, **kwargs)
                 return await wrapped_func(*args, **kwargs)
 
         else:
@@ -198,7 +188,7 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
             def wrapper(*args, **kwargs):
                 self._check_request_type(*args, **kwargs)
                 body = self._get_request_json()
-                kwargs = self._process_request_kwargs(body, signature, request_arg, *args, **kwargs)
+                args, kwargs = self._process_request_args(body, signature, request_arg, *args, **kwargs)
                 return wrapped_func(*args, **kwargs)
 
         _add_ignored_param(wrapper, request_arg.name)
@@ -208,19 +198,21 @@ class AcceptsDecorator(metaclass=abc.ABCMeta):
         if self._get_request_content_type(*args, **kwargs) != "application/json":
             raise ApiClientError("Unsupported media type, JSON is expected")
 
-    def _process_request_kwargs(self, body, signature, request_arg, *args, **kwargs):
+    def _process_request_args(
+        self, body, signature: inspect.Signature, request_param: inspect.Parameter, *args, **kwargs
+    ):
         bound_args = signature.bind_partial(*args, **kwargs)
-        if request_arg.name not in bound_args.arguments:
-            request_object = self._request_class.__new__(self._request_class)
+        request_object = self._request_class.__new__(self._request_class)
 
-            try:
-                request_object.__init__(body, validate=True, partial=False, strict=True)
-            except DataError as e:
-                raise InvalidFieldsError(e.errors) from e
+        try:
+            request_object.__init__(body, validate=True, partial=False, strict=True)
+        except DataError as e:
+            raise InvalidFieldsError(e.errors) from e
 
-            new_kwargs = {request_arg.name: request_object}
-            new_kwargs.update(**kwargs)
-            return new_kwargs
+        new_kwargs = bound_args.kwargs
+        new_kwargs[request_param.name] = request_object
+
+        return bound_args.args, new_kwargs
 
     @abc.abstractmethod
     def _get_request_content_type(self, *args, **kwargs) -> str:
@@ -240,11 +232,13 @@ class AcceptsFileDecorator:
     A decorator used to declare that an endpoint accepts a file upload in the request body.
     """
 
-    def __init__(self, mime_type: str = None):
+    def __init__(self, apistrap: Apistrap, mime_type: str = None):
         self.mime_type = mime_type or "application/octet-stream"
+        self._apistrap = apistrap
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
+        wrapped_func = self._apistrap.pre_decorate(wrapped_func)
 
         wrapped_func.specs_dict["requestBody"] = {
             "content": {self.mime_type: {"schema": {"type": "string", "format": "binary"}}},
@@ -275,6 +269,7 @@ class TagsDecorator:
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
+        wrapped_func = self._extension.pre_decorate(wrapped_func)
         wrapped_func.specs_dict.setdefault("tags", [])
 
         for tag in self._tags:
@@ -297,6 +292,7 @@ class SecurityDecorator:
 
     def __call__(self, wrapped_func: Callable):
         _ensure_specs_dict(wrapped_func)
+        wrapped_func = self._extension.pre_decorate(wrapped_func)
         wrapped_func.specs_dict.setdefault("security", [])
 
         for scheme in self._extension.security_schemes:

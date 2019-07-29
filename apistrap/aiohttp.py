@@ -1,3 +1,4 @@
+import functools
 import inspect
 import json
 import logging
@@ -7,7 +8,7 @@ from copy import deepcopy
 from itertools import chain
 from os import path
 from pathlib import Path
-from typing import Any, Callable, Coroutine, List, Optional, Tuple, Type
+from typing import Any, Callable, Coroutine, List, Optional, Tuple, Type, Set
 
 import jinja2
 from aiohttp import StreamReader, web
@@ -105,6 +106,13 @@ class AioHTTPAcceptsDecorator(AcceptsDecorator):
             raise ApiClientError("The request body must be a JSON object")
 
         return data
+
+    def _process_request_args(
+        self, body, signature: inspect.Signature, request_param: inspect.Parameter, *args, **kwargs
+    ):
+        args, kwargs = super()._process_request_args(body, signature, request_param, *args, **kwargs)
+
+        return args, kwargs
 
 
 ErrorHandler = Callable[[Exception], Tuple[ErrorResponse, int]]
@@ -209,8 +217,6 @@ class ErrorHandlerMiddleware:
 
 
 class AioHTTPApistrap(Apistrap):
-    SYNTHETIC_WRAPPER_ATTR = "aiohttp_apistrap_wrapped_function"
-
     def __init__(self):
         super().__init__()
         self.app: web.Application = None
@@ -338,13 +344,29 @@ class AioHTTPApistrap(Apistrap):
 
     def _process_route_parameters(self, route: AbstractRoute) -> None:
         """
-        If necessary, wrap the route handler with a coroutine that accepts a AioHTTP request, extracts parameters to
-        satisfy the underlying handler and forwards them to the original handler.
+        Check path parameter types and pre-decorate the route handler if necessary.
 
-        :param route: the route whose handler should be wrapped
+        :param route: the route whose handler should be processed
         """
 
-        signature = inspect.signature(route.handler)
+        handler = route.handler
+        wrapped_handler = self.pre_decorate(handler)
+        signature = inspect.signature(wrapped_handler)
+
+        accepted_path_params = self._get_path_parameters(signature, route)
+
+        for param in accepted_path_params:
+            self._check_parameter_type(signature.parameters[param])
+
+        if wrapped_handler is not handler:
+            route._handler = wrapped_handler  # HACK
+
+    def _get_request_parameter(self, signature: inspect.Signature) -> Optional[inspect.Parameter]:
+        """
+        Find the parameter of a function into which the AioHTTP request should be passed.
+        :param signature: signature of the examined function
+        :return: a parameter object or None
+        """
 
         request_params = filter(lambda p: issubclass(p.annotation, BaseRequest), signature.parameters.values())
         request_param: Optional[inspect.Parameter] = next(request_params, None)
@@ -359,38 +381,49 @@ class AioHTTPApistrap(Apistrap):
         ):
             request_param = signature.parameters["request"]
 
-        takes_aiohttp_request = request_param is not None
+        return request_param
 
-        additional_params: List[inspect.Parameter] = [
+    def _get_path_parameters(self, signature: inspect.Signature, route: AbstractRoute) -> Set[str]:
+        """
+        Get a set of path parameter names accepted by a view function.
+        """
+        request_param = self._get_request_parameter(signature)
+
+        additional_params: List[str] = [
             *filter(
-                lambda p: not takes_aiohttp_request or signature.parameters[p] != request_param,
-                signature.parameters.keys(),
+                lambda p: request_param is None or signature.parameters[p] != request_param, signature.parameters.keys()
             )
         ]
 
-        if not takes_aiohttp_request or additional_params:
-            handler = route.handler
-            accepted_path_params = set(self._get_route_parameter_names(route)).intersection(additional_params)
+        return set(self._get_route_parameter_names(route)).intersection(additional_params)
 
-            for param in accepted_path_params:
-                self._check_parameter_type(signature.parameters[param])
+    def _pre_decorator(self, wrapped_func: Callable) -> Callable:
+        """
+        A pre-decorator that converts an AioHTTP request to path parameters.
+        """
 
-            async def wrapped_handler(request: Request):
-                kwargs = {
+        signature = inspect.signature(wrapped_func)
+
+        @functools.wraps(wrapped_func)
+        async def wrapped_handler(request: Request, *args, **kwargs):
+            accepted_path_params = self._get_path_parameters(signature, request.match_info.route)
+
+            kwargs.update(
+                {
                     name: self._parse_parameter_value(signature.parameters[name], request.match_info[name])
                     for name in accepted_path_params
                 }
+            )
 
-                if takes_aiohttp_request:
-                    kwargs[request_param.name] = request
+            request_param = self._get_request_parameter(signature)
+            if request_param is not None:
+                kwargs[request_param.name] = request
 
-                bound_args: inspect.BoundArguments = signature.bind_partial(**kwargs)
+            bound_args: inspect.BoundArguments = signature.bind_partial(*args, **kwargs)
 
-                return await handler(*bound_args.args, **bound_args.kwargs)
+            return await wrapped_func(*bound_args.args, **bound_args.kwargs)
 
-            setattr(wrapped_handler, self.SYNTHETIC_WRAPPER_ATTR, handler)
-
-            route._handler = wrapped_handler  # HACK
+        return wrapped_handler
 
     def _extract_operation_spec(self, route: AbstractRoute) -> dict:
         """
@@ -400,7 +433,7 @@ class AioHTTPApistrap(Apistrap):
         :return: a dict with specification data
         """
 
-        handler = getattr(route.handler, self.SYNTHETIC_WRAPPER_ATTR, route.handler)
+        handler = route.handler
 
         specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
         specs_dict["operationId"] = snake_to_camel(handler.__name__)

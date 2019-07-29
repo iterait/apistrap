@@ -16,6 +16,7 @@ from apistrap.decorators import (
 )
 from apistrap.errors import ApistrapExtensionError
 from apistrap.tags import TagData
+from apistrap.utils import get_wrapped_function, unwrap_function
 
 
 class SecurityScheme(metaclass=ABCMeta):
@@ -94,6 +95,7 @@ class Apistrap(metaclass=ABCMeta):
     """
 
     PARAMETER_TYPE_MAP = {int: "integer", str: "string"}
+    PRE_DECORATOR_ATTR = "apistrap_pre_decorated"
 
     def __init__(self):
         self.spec = APISpec(openapi_version=OpenAPIVersion("3.0.2"), title="API created with Apistrap", version="1.0.0")
@@ -118,6 +120,20 @@ class Apistrap(metaclass=ABCMeta):
 
         return result
 
+    def pre_decorate(self, wrapped_func: Callable):
+        """
+        If necessary, apply the pre-decorator to the supplied function. This must be called by all decorators.
+        """
+
+        for func in unwrap_function(wrapped_func):
+            if getattr(func, self.PRE_DECORATOR_ATTR, False):
+                return wrapped_func
+
+        decorated_func = self._pre_decorator(wrapped_func)
+        setattr(decorated_func, self.PRE_DECORATOR_ATTR, True)
+
+        return decorated_func
+
     ######################################
     # Extension points for child classes #
     ######################################
@@ -127,6 +143,13 @@ class Apistrap(metaclass=ABCMeta):
         """
         Check whether the extension is bound to an app.
         """
+
+    def _pre_decorator(self, wrapped_func: Callable) -> Callable:
+        """
+        Return a wrapper for a view handler. This wrapper will be applied before any other Apistrap decorators.
+        """
+
+        return wrapped_func
 
     ###################
     # Utility methods #
@@ -375,4 +398,4 @@ class Apistrap(metaclass=ABCMeta):
         """
         A decorator used to declare that an endpoint accepts a file as the request body.
         """
-        return AcceptsFileDecorator(mime_type)
+        return AcceptsFileDecorator(self, mime_type)
