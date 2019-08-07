@@ -1,7 +1,8 @@
 import abc
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Type, Union, TypeVar
+from itertools import chain
+from typing import Callable, Dict, List, Optional, Type, Union, TypeVar, Tuple, cast, Sequence
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
@@ -17,7 +18,9 @@ from apistrap.decorators import (
 )
 from apistrap.errors import ApistrapExtensionError
 from apistrap.schemas import ErrorResponse
+from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.tags import TagData
+from apistrap.utils import resolve_fw_decl
 
 
 class SecurityScheme(metaclass=ABCMeta):
@@ -96,8 +99,14 @@ ExceptionType = TypeVar("ExceptionType", bound=Exception)
 @dataclass
 class ErrorHandler:
     exception_class: Type[Exception]
-    http_code: int
+    http_code: Union[int, Callable[[Type[Exception]], int]]
     handler: Callable[[Exception], ErrorResponse]
+
+    def get_code(self, exception_type: Type[Exception]) -> int:
+        if callable(self.http_code):
+            return self.http_code(exception_type)
+
+        return self.http_code
 
 
 class Apistrap(metaclass=ABCMeta):
@@ -141,6 +150,12 @@ class Apistrap(metaclass=ABCMeta):
         Check whether the extension is bound to an app.
         """
 
+    @abc.abstractmethod
+    def _get_default_error_handlers(self) -> Sequence[ErrorHandler]:
+        """
+        Get a collection of default error handlers
+        """
+
     ###################
     # Utility methods #
     ###################
@@ -174,10 +189,35 @@ class Apistrap(metaclass=ABCMeta):
         return self.PARAMETER_TYPE_MAP.get(annotation, "string")
 
     def _parameters_from_docblock(self, docblock: Optional[str]) -> Dict[str, str]:
-
         return {
             param.arg_name: param.description for param in parse_doc(docblock).params if param.description.strip() != ""
         }
+
+    def _error_responses_from_docblock(self, handler: Callable):
+        result = {}
+
+        for item in parse_doc(handler.__doc__).raises:
+            exception_type = cast(Type[Exception], resolve_fw_decl(handler, item.type_name))
+            code = self.exception_to_http_code(exception_type)
+
+            if code is None:
+                continue
+
+            result[code] = {
+                "description": item.description,
+                "content": {
+                    "application/json": {
+                        "type": "object",
+                        "schema": {
+                            "$ref": self.add_schema_definition(
+                                "ErrorResponse", schematics_model_to_schema_object(ErrorResponse)
+                            )
+                        },
+                    }
+                },
+            }
+
+        return result
 
     def _descriptions_from_docblock(self, docblock: Optional[str], target: dict):
         if docblock is None:
@@ -188,12 +228,37 @@ class Apistrap(metaclass=ABCMeta):
         target["summary"] = parsed.short_description
         target["description"] = parsed.long_description
 
-    def exception_to_http_code(self, exception_class: Type[Exception]) -> Optional[int]:
-        for handler in self._error_handlers:
+    def _exception_handler(self, exception_class: Type[Exception]) -> Optional[ErrorHandler]:
+        if self.use_default_error_handlers:
+            handlers = chain(self._error_handlers, self._get_default_error_handlers())
+        else:
+            handlers = self._error_handlers
+
+        for handler in handlers:
             if issubclass(exception_class, handler.exception_class):
-                return handler.http_code
+                return handler
 
         return None
+
+    def exception_to_http_code(self, exception_class: Type[Exception]) -> Optional[int]:
+        handler = self._exception_handler(exception_class)
+
+        if handler is None:
+            return 500
+
+        return handler.get_code(exception_class)
+
+    def exception_to_response(self, exception: Exception) -> Optional[Tuple[ErrorResponse, int]]:
+        handler = self._exception_handler(type(exception))
+
+        if handler is None:
+            return None
+
+        return handler.handler(exception), handler.get_code(type(exception))
+
+    @property
+    def has_error_handlers(self) -> bool:
+        return self.use_default_error_handlers or self._error_handlers
 
     ############################
     # Configuration properties #
@@ -262,12 +327,16 @@ class Apistrap(metaclass=ABCMeta):
         self._use_default_error_handlers = value
 
     def add_error_handler(
-            self, exception_class: Type[ExceptionType], http_code: int, handler: Callable[[ExceptionType], ErrorResponse]
+        self,
+        exception_class: Type[ExceptionType],
+        http_code: Union[int, Callable[[Type[ExceptionType]], int]],
+        handler: Callable[[ExceptionType], ErrorResponse],
     ) -> None:
         """
         Add an error handler function.
         """
 
+        self._ensure_not_bound("You cannot add error handlers after binding the extension with an app")
         self._error_handlers.append(ErrorHandler(exception_class, http_code, handler))
 
     ###################################

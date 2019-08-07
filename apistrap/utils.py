@@ -80,7 +80,4 @@ def get_type_hints(function: Callable) -> Dict[str, Type]:
     Get a dictionary of resolved type annotations for a function.
     """
 
-    return {
-        name: resolve_fw_decl(function, annotation)
-        for name, annotation in function.__annotations__.items()
-    }
+    return {name: resolve_fw_decl(function, annotation) for name, annotation in function.__annotations__.items()}

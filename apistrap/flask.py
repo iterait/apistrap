@@ -4,7 +4,7 @@ import logging
 import re
 from copy import deepcopy
 from os import path
-from typing import Optional, Type
+from typing import Optional, Type, Sequence
 
 from flask import Blueprint, Flask, Response, jsonify, render_template, request, send_file
 from schematics import Model
@@ -13,7 +13,7 @@ from werkzeug.exceptions import HTTPException
 
 from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator
 from apistrap.errors import ApiClientError, ApiServerError, InvalidResponseError, UnexpectedResponseError
-from apistrap.extension import Apistrap
+from apistrap.extension import Apistrap, ErrorHandler
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
 from apistrap.utils import format_exception, snake_to_camel
@@ -69,6 +69,13 @@ class FlaskApistrap(Apistrap):
         self._app: Flask = None
         self._specs_extracted = False
 
+        self._default_error_handlers = (
+            ErrorHandler(HTTPException, lambda exc_type: exc_type.code, self.http_error_handler),
+            ErrorHandler(ApiClientError, 400, self.error_handler),
+            ErrorHandler(ApiServerError, 500, self.internal_error_handler),
+            ErrorHandler(Exception, 500, self.internal_error_handler),
+        )
+
     def init_app(self, app: Flask):
         """
         Bind the extension to a Flask instance.
@@ -90,12 +97,21 @@ class FlaskApistrap(Apistrap):
             blueprint.route(self.redoc_url + "/")(self._get_redoc)
 
         app.register_blueprint(blueprint)
+        if self.has_error_handlers:
+            app.register_error_handler(Exception, self._error_handler)
 
-        if self.use_default_error_handlers:
-            app.register_error_handler(HTTPException, self.http_error_handler)
-            app.register_error_handler(ApiClientError, self.error_handler)
-            app.register_error_handler(ApiServerError, self.internal_error_handler)
-            app.register_error_handler(Exception, self.internal_error_handler)
+    def _error_handler(self, exception: Exception):
+        response = self.exception_to_response(exception)
+
+        if response is None:
+            raise ValueError(f"Unexpected exception type `{type(exception).__name__}`") from exception
+
+        info, code = response
+
+        return jsonify(info.to_primitive()), code
+
+    def _get_default_error_handlers(self) -> Sequence[ErrorHandler]:
+        return self._default_error_handlers
 
     def _is_bound(self) -> bool:
         return self._app is not None
@@ -162,6 +178,7 @@ class FlaskApistrap(Apistrap):
         specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
 
         self._descriptions_from_docblock(handler.__doc__, specs_dict)
+        specs_dict["responses"].update(self._error_responses_from_docblock(handler))
 
         specs_dict["operationId"] = snake_to_camel(handler.__name__)
 
@@ -185,15 +202,18 @@ class FlaskApistrap(Apistrap):
 
         return specs_dict
 
-    def http_error_handler(self, exception: HTTPException):
+    def http_error_handler(self, exception: Exception):
         """
         A handler for Flask HTTPException objects
         :param exception: the exception raised due to a client error
         :return: a response object
         """
 
+        if not isinstance(exception, HTTPException):
+            raise ValueError()
+
         logging.exception(exception)
-        return jsonify(ErrorResponse(dict(message=exception.description)).to_primitive()), exception.code
+        return ErrorResponse(dict(message=exception.description))
 
     def error_handler(self, exception):
         """
@@ -204,11 +224,9 @@ class FlaskApistrap(Apistrap):
 
         if self._app.debug:
             logging.exception(exception)
-            error_response = ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
-        else:
-            error_response = ErrorResponse(dict(message=str(exception)))
+            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
 
-        return jsonify(error_response.to_primitive()), 400
+        return ErrorResponse(dict(message=str(exception)))
 
     def internal_error_handler(self, exception):
         """
@@ -220,11 +238,9 @@ class FlaskApistrap(Apistrap):
         logging.exception(exception)
 
         if self._app.debug:
-            error_response = ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
-        else:
-            error_response = ErrorResponse(dict(message="Internal server error"))
+            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
 
-        return jsonify(error_response.to_primitive()), 500
+        return ErrorResponse(dict(message="Internal server error"))
 
     def responds_with(
         self,
@@ -232,7 +248,7 @@ class FlaskApistrap(Apistrap):
         *,
         code: int = 200,
         description: Optional[str] = None,
-        mimetype: Optional[str] = None
+        mimetype: Optional[str] = None,
     ):
         return FlaskRespondsWithDecorator(self, response_class, code=code, description=description, mimetype=mimetype)
 
