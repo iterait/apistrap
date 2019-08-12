@@ -3,15 +3,16 @@ import json
 import logging
 import re
 from copy import deepcopy
+from functools import wraps
 from os import path
-from typing import Optional, Type
+from typing import Optional, Type, Callable
 
 from flask import Blueprint, Flask, Response, jsonify, render_template, request, send_file
 from schematics import Model
 from schematics.exceptions import DataError
 from werkzeug.exceptions import HTTPException
 
-from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator
+from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator, AcceptsQueryStringDecorator
 from apistrap.errors import ApiClientError, ApiServerError, InvalidResponseError, UnexpectedResponseError
 from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
@@ -61,6 +62,30 @@ class FlaskAcceptsDecorator(AcceptsDecorator):
             raise ApiClientError("The request body must be a JSON object") from ex
 
         return request.json
+
+
+class FlaskAcceptsQueryStringDecorator(AcceptsQueryStringDecorator):
+    def _wrap(self, function: Callable):
+        signature: inspect.Signature = inspect.signature(function)
+
+        @wraps(function)
+        def wrapper(*args, **kwargs):
+            qs_args = {}
+            for param_name in self._parameter_names:
+                param_type = function.__annotations__[param_name]
+                param_refl: inspect.Parameter = signature.parameters[param_name]
+                if param_refl.default == inspect.Parameter.empty:
+                    if param_name not in request.args.keys():
+                        raise ApiClientError()
+
+                    qs_args[param_name] = param_type(request.args[param_name])
+                else:
+                    qs_args[param_name] = param_type(request.args.get(param_name, param_refl.default))
+
+            bound = signature.bind_partial(*args, **kwargs, **qs_args)
+            return function(*bound.args, **bound.kwargs)
+
+        return wrapper
 
 
 class FlaskApistrap(Apistrap):
@@ -238,3 +263,6 @@ class FlaskApistrap(Apistrap):
 
     def accepts(self, request_class: Type[Model]):
         return FlaskAcceptsDecorator(self, request_class)
+
+    def accepts_qs(self, *param_names: str):
+        return FlaskAcceptsQueryStringDecorator(self, param_names)

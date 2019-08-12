@@ -4,6 +4,7 @@ import logging
 import mimetypes
 import re
 from copy import deepcopy
+from functools import wraps
 from itertools import chain
 from os import path
 from pathlib import Path
@@ -18,7 +19,7 @@ from aiohttp.web_urldispatcher import AbstractRoute, DynamicResource, PlainResou
 from schematics import Model
 from schematics.exceptions import DataError
 
-from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator
+from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator, AcceptsQueryStringDecorator
 from apistrap.errors import ApiClientError, InvalidResponseError, UnexpectedResponseError
 from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
@@ -105,6 +106,30 @@ class AioHTTPAcceptsDecorator(AcceptsDecorator):
             raise ApiClientError("The request body must be a JSON object")
 
         return data
+
+
+class AioHTTPAcceptsQueryStringDecorator(AcceptsQueryStringDecorator):
+    def _wrap(self, function: Callable):
+        signature = inspect.signature(function)
+
+        @wraps(function)
+        async def wrapper(request: BaseRequest, *args, **kwargs):
+            qs_args = {}
+            for param_name in self._parameter_names:
+                param_type = function.__annotations__[param_name]
+                param_refl: inspect.Parameter = signature.parameters[param_name]
+                if param_refl.default == inspect.Parameter.empty:
+                    if param_name not in request.rel_url.query.keys():
+                        raise ApiClientError()
+
+                    qs_args[param_name] = param_type(request.rel_url.query[param_name])
+                else:
+                    qs_args[param_name] = param_type(request.rel_url.query.get(param_name, param_refl.default))
+
+            bound = signature.bind_partial(request, *args, **kwargs, **qs_args)
+            return await function(*bound.args, **bound.kwargs)
+
+        return wrapper
 
 
 ErrorHandler = Callable[[Exception], Tuple[ErrorResponse, int]]
@@ -437,3 +462,6 @@ class AioHTTPApistrap(Apistrap):
         The destination argument must be annotated with the request type.
         """
         return AioHTTPAcceptsDecorator(self, request_class)
+
+    def accepts_qs(self, *param_names: str):
+        return AioHTTPAcceptsQueryStringDecorator(self, param_names)

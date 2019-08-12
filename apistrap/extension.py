@@ -371,6 +371,12 @@ class Apistrap(metaclass=ABCMeta):
         The destination argument must be annotated with the request type.
         """
 
+    @abc.abstractmethod
+    def accepts_qs(self, *param_names: str):
+        """
+        A decorator used to declare that an endpoint accepts one or more query string parameters.
+        """
+
     def accepts_file(self, mime_type: str = None):
         """
         A decorator used to declare that an endpoint accepts a file as the request body.

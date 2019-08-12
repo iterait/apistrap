@@ -5,6 +5,7 @@ import inspect
 from functools import wraps
 from typing import TYPE_CHECKING, Callable, Optional, Sequence, Type, Union
 
+from docstring_parser import parse as parse_doc
 from schematics import Model
 from schematics.exceptions import DataError
 
@@ -249,6 +250,51 @@ class AcceptsFileDecorator:
         }
 
         return wrapped_func
+
+
+class AcceptsQueryStringDecorator:
+    """
+    A decorator used to declare that an endpoint accepts one or more query string parameters.
+    """
+
+    def __init__(self, extension: Apistrap, parameter_names: Sequence[str]):
+        self._parameter_names = parameter_names
+        self._extension = extension
+
+    def __call__(self, wrapped_func: Callable):
+        _ensure_specs_dict(wrapped_func)
+        wrapped_func.specs_dict.setdefault("parameters", [])
+
+        signature = inspect.signature(wrapped_func)
+        doc = parse_doc(wrapped_func.__doc__)
+
+        for param_name in self._parameter_names:
+            _add_ignored_param(wrapped_func, param_name)
+            param: inspect.Parameter = signature.parameters[param_name]
+            param_description = None
+
+            for item in doc.params:
+                if item.arg_name == param_name:
+                    param_description = item.description
+                    break
+
+            wrapped_func.specs_dict["parameters"].append({
+                "name": param_name,
+                "in": "query",
+                "description": param_description,
+                "required": param.default == inspect.Parameter.empty,
+                "schema": {
+                    "type": self._extension.PARAMETER_TYPE_MAP.get(wrapped_func.__annotations__[param_name], "string")
+                }
+            })
+
+        return self._wrap(wrapped_func)
+
+    @abc.abstractmethod
+    def _wrap(self, function: Callable):
+        """
+        Wrap an endpoint handler so that it receives query string arguments through its parameters.
+        """
 
 
 class IgnoreDecorator:
