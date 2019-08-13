@@ -7,7 +7,7 @@ from copy import deepcopy
 from itertools import chain
 from os import path
 from pathlib import Path
-from typing import Any, Callable, Coroutine, List, Optional, Tuple, Type
+from typing import Any, Callable, Coroutine, List, Optional, Tuple, Type, Sequence
 
 import jinja2
 from aiohttp import StreamReader, web
@@ -20,7 +20,7 @@ from schematics.exceptions import DataError
 
 from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator
 from apistrap.errors import ApiClientError, InvalidResponseError, UnexpectedResponseError
-from apistrap.extension import Apistrap
+from apistrap.extension import Apistrap, ErrorHandler
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
 from apistrap.utils import format_exception, snake_to_camel, get_type_hints
@@ -107,9 +107,6 @@ class AioHTTPAcceptsDecorator(AcceptsDecorator):
         return data
 
 
-ErrorHandler = Callable[[Exception], Tuple[ErrorResponse, int]]
-
-
 @web.middleware
 class ErrorHandlerMiddleware:
     """
@@ -121,21 +118,6 @@ class ErrorHandlerMiddleware:
         :param apistrap: The apistrap extension object
         """
         self._apistrap = apistrap
-        self._handlers = []
-        self._default_handlers = [
-            (HTTPError, self._handle_http_error),
-            (ApiClientError, self._handle_client_error),
-            (Exception, self._handle_server_error),
-        ]
-
-    def add_handler(self, exception_type: Type[Exception], handler: ErrorHandler) -> None:
-        """
-        Add a new error handler.
-
-        :param exception_type: Only instances of this exception type will be handled by the handler
-        :param handler: A function that handles the exception and returns a response
-        """
-        self._handlers.append((exception_type, handler))
 
     def handle_error(self, exception: Exception) -> Tuple[ErrorResponse, int]:
         """
@@ -144,49 +126,13 @@ class ErrorHandlerMiddleware:
         :param exception: the exception to be handled
         :return: an ErrorResponse instance
         """
-        for handled_type, handler in chain(
-            self._handlers, self._default_handlers if self._apistrap.use_default_error_handlers else []
-        ):
-            if isinstance(exception, handled_type):
-                return handler(exception)
 
-        raise ValueError(f"Unexpected exception type `{type(exception).__name__}`") from exception
+        response = self._apistrap.exception_to_response(exception)
 
-    def _handle_server_error(self, exception):
-        """
-        Default handler for server errors (500-599).
+        if response is None:
+            raise ValueError(f"Unexpected exception type `{type(exception).__name__}`") from exception
 
-        :param exception: the exception to be handled
-        :return: an ErrorResponse instance
-        """
-        logging.exception(exception)
-        if self._apistrap.app.debug:
-            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception))), 500
-        else:
-            return ErrorResponse(dict(message="Internal server error")), 500
-
-    def _handle_client_error(self, exception):
-        """
-        Default handler for client errors (400-499).
-
-        :param exception: the exception to be handled
-        :return: an ErrorResponse instance
-        """
-        if self._apistrap.app.debug:
-            logging.exception(exception)
-            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception))), 400
-        else:
-            return ErrorResponse(dict(message=str(exception))), 400
-
-    def _handle_http_error(self, exception):
-        """
-        Default handler for http errors (e.g. 404).
-
-        :param exception: the exception to be handled
-        :return: an ErrorResponse instance
-        """
-        logging.exception(exception)
-        return ErrorResponse(dict(message=exception.text)), exception.status_code
+        return response
 
     async def __call__(
         self, request: BaseRequest, handler: Callable[[BaseRequest], Coroutine[Any, Any, Response]]
@@ -218,6 +164,11 @@ class AioHTTPApistrap(Apistrap):
         self._jinja_env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(path.join(path.dirname(__file__), "templates"))
         )
+        self._default_error_handlers = [
+            ErrorHandler(HTTPError, lambda exc_type: exc_type.status_code, self._handle_http_error),
+            ErrorHandler(ApiClientError, 400, self._handle_client_error),
+            ErrorHandler(Exception, 500, self._handle_server_error),
+        ]
 
     def init_app(self, app: web.Application) -> None:
         """
@@ -240,6 +191,45 @@ class AioHTTPApistrap(Apistrap):
             if self.redoc_url is not None:
                 for redoc_url in (self.redoc_url, self.redoc_url + "/"):
                     app.router.add_route("get", redoc_url, self._get_redoc)
+
+    def _handle_server_error(self, exception):
+        """
+        Default handler for server errors (500-599).
+
+        :param exception: the exception to be handled
+        :return: an ErrorResponse instance
+        """
+        logging.exception(exception)
+        if self.app.debug:
+            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
+        else:
+            return ErrorResponse(dict(message="Internal server error"))
+
+    def _handle_client_error(self, exception):
+        """
+        Default handler for client errors (400-499).
+
+        :param exception: the exception to be handled
+        :return: an ErrorResponse instance
+        """
+        if self.app.debug:
+            logging.exception(exception)
+            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
+        else:
+            return ErrorResponse(dict(message=str(exception)))
+
+    def _handle_http_error(self, exception: Exception):
+        """
+        Default handler for http errors (e.g. 404).
+
+        :param exception: the exception to be handled
+        :return: an ErrorResponse instance
+        """
+        if not isinstance(exception, HTTPError):
+            raise ValueError()
+
+        logging.exception(exception)
+        return ErrorResponse(dict(message=exception.text))
 
     def _get_spec(self, request: Request):
         """
@@ -386,6 +376,7 @@ class AioHTTPApistrap(Apistrap):
         specs_dict["operationId"] = snake_to_camel(handler.__name__)
 
         self._descriptions_from_docblock(handler.__doc__, specs_dict)
+        specs_dict["responses"].update(self._error_responses_from_docblock(handler))
 
         signature = inspect.signature(handler)
         param_doc = self._parameters_from_docblock(handler.__doc__)
@@ -416,6 +407,9 @@ class AioHTTPApistrap(Apistrap):
 
     def _is_bound(self) -> bool:
         return self.app is not None
+
+    def _get_default_error_handlers(self) -> Sequence[ErrorHandler]:
+        return self._default_error_handlers
 
     def responds_with(
         self,
