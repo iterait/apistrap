@@ -23,7 +23,7 @@ from apistrap.errors import ApiClientError, InvalidResponseError, UnexpectedResp
 from apistrap.extension import Apistrap
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
-from apistrap.utils import format_exception, snake_to_camel
+from apistrap.utils import format_exception, snake_to_camel, get_type_hints
 
 
 class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
@@ -307,34 +307,16 @@ class AioHTTPApistrap(Apistrap):
 
             self.spec.path(url, {route.method.lower(): self._extract_operation_spec(route)})
 
-    def _check_parameter_type(self, parameter: inspect.Parameter):
+    def _check_parameter_type(self, parameter_type: Optional[type]):
         """
         Make sure that given parameter is annotated with a supported type
 
-        :param parameter: the parameter to check
+        :param parameter_type: type of the parameter to check
         :raises TypeError: on unsupported parameters
         """
 
-        criteria = [
-            parameter.annotation == inspect.Parameter.empty,
-            parameter.annotation == str,
-            parameter.annotation == "str",
-            parameter.annotation == int,
-            parameter.annotation == "int",
-        ]
-
-        if not any(criteria):
+        if parameter_type not in (str, int, None):
             raise TypeError("Unsupported parameter type")
-
-    def _parse_parameter_value(self, parameter: inspect.Parameter, value: str):
-        if parameter.annotation == inspect.Parameter.empty:
-            return value
-
-        if parameter.annotation == str or parameter.annotation == "str":
-            return str(value)
-
-        if parameter.annotation == int or parameter.annotation == "int":
-            return int(value)
 
     def _process_route_parameters(self, route: AbstractRoute) -> None:
         """
@@ -346,43 +328,41 @@ class AioHTTPApistrap(Apistrap):
 
         signature = inspect.signature(route.handler)
 
-        request_params = filter(lambda p: issubclass(p.annotation, BaseRequest), signature.parameters.values())
-        request_param: Optional[inspect.Parameter] = next(request_params, None)
+        request_params = [*filter(lambda hint: issubclass(hint[1], BaseRequest), get_type_hints(route.handler).items())]
+        request_param_name: Optional[str] = request_params[0][0] if request_params else None
 
-        if next(request_params, None) is not None:
+        if len(request_params) > 1:
             raise TypeError("The decorated view has more than one possible parameter for the AioHTTP request")
 
         if (
-            request_param is None
+            request_param_name is None
             and "request" in signature.parameters.keys()
             and signature.parameters["request"].annotation == inspect.Signature.empty
         ):
-            request_param = signature.parameters["request"]
+            request_param_name = signature.parameters["request"].name
 
-        takes_aiohttp_request = request_param is not None
+        takes_aiohttp_request = request_param_name is not None
 
-        additional_params: List[inspect.Parameter] = [
-            *filter(
-                lambda p: not takes_aiohttp_request or signature.parameters[p] != request_param,
-                signature.parameters.keys(),
-            )
+        additional_params: List[str] = [
+            *filter(lambda p: not takes_aiohttp_request or p != request_param_name, signature.parameters.keys())
         ]
 
         if not takes_aiohttp_request or additional_params:
             handler = route.handler
             accepted_path_params = set(self._get_route_parameter_names(route)).intersection(additional_params)
+            type_hints = get_type_hints(route.handler)
 
             for param in accepted_path_params:
-                self._check_parameter_type(signature.parameters[param])
+                self._check_parameter_type(type_hints.get(param, None))
 
             async def wrapped_handler(request: Request):
                 kwargs = {
-                    name: self._parse_parameter_value(signature.parameters[name], request.match_info[name])
+                    name: type_hints[name](request.match_info[name]) if name in type_hints else request.match_info[name]
                     for name in accepted_path_params
                 }
 
                 if takes_aiohttp_request:
-                    kwargs[request_param.name] = request
+                    kwargs[request_param_name] = request
 
                 bound_args: inspect.BoundArguments = signature.bind_partial(**kwargs)
 
