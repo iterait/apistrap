@@ -18,7 +18,9 @@ from apistrap.decorators import (
     RespondsWithDecorator,
     SecurityDecorator,
     TagsDecorator,
-    IgnoreParamsDecorator, AcceptsFileDecorator)
+    IgnoreParamsDecorator,
+    AcceptsFileDecorator,
+)
 from apistrap.errors import ApiClientError, InvalidResponseError, UnexpectedResponseError, InvalidFieldsError
 from apistrap.examples import ExamplesMixin, model_examples_to_openapi_dict
 from apistrap.schemas import ErrorResponse
@@ -159,14 +161,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             spec["x-codegen-request-body-name"] = "body"
         elif self._request_body_file_type:
             spec["requestBody"] = {
-                "content": {
-                    self._request_body_file_type: {
-                        "schema": {
-                            "type": "string",
-                            "format": "binary"
-                        }
-                    }
-                }
+                "content": {self._request_body_file_type: {"schema": {"type": "string", "format": "binary"}}}
             }
 
         if self._security:
