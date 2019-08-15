@@ -14,3 +14,6 @@ class TagData:
             result["description"] = self.description
 
         return result
+
+    def __str__(self):
+        return self.name

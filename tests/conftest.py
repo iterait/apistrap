@@ -30,7 +30,6 @@ def flask_apistrap(app):
 def aiohttp_initialized_client(aiohttp_client):
     async def func(app: Application):
         app.freeze()
-        await app.startup()
         return await aiohttp_client(app)
 
     yield func
