@@ -193,49 +193,6 @@ class Apistrap(metaclass=ABCMeta):
 
         return False
 
-    def _parameter_annotation_to_openapi_type(self, annotation):
-        return self.PARAMETER_TYPE_MAP.get(annotation, "string")
-
-    def _parameters_from_docblock(self, docblock: Optional[str]) -> Dict[str, str]:
-        return {
-            param.arg_name: param.description for param in parse_doc(docblock).params if param.description.strip() != ""
-        }
-
-    def _error_responses_from_docblock(self, handler: Callable):
-        result = {}
-
-        for item in parse_doc(handler.__doc__).raises:
-            exception_type = cast(Type[Exception], resolve_fw_decl(handler, item.type_name))
-            code = self.exception_to_http_code(exception_type)
-
-            if code is None:
-                continue
-
-            result[code] = {
-                "description": item.description,
-                "content": {
-                    "application/json": {
-                        "type": "object",
-                        "schema": {
-                            "$ref": self.add_schema_definition(
-                                "ErrorResponse", schematics_model_to_schema_object(ErrorResponse)
-                            )
-                        },
-                    }
-                },
-            }
-
-        return result
-
-    def _descriptions_from_docblock(self, docblock: Optional[str], target: dict):
-        if docblock is None:
-            return {}
-
-        parsed = parse_doc(docblock)
-
-        target["summary"] = parsed.short_description
-        target["description"] = parsed.long_description
-
     def _exception_handler(self, exception_class: Type[Exception]) -> Optional[ErrorHandler]:
         if self.use_default_error_handlers:
             handlers = chain(self._error_handlers, self._get_default_error_handlers())
