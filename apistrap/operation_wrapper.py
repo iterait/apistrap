@@ -29,7 +29,7 @@ from apistrap.tags import TagData
 from apistrap.types import FileResponse
 from apistrap.utils import resolve_fw_decl, snake_to_camel
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from apistrap.extension import Apistrap
 
 
@@ -122,9 +122,6 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             spec["parameters"].append(param_spec)
 
         for name, param_type in self._query_parameters.items():
-            if self._is_param_ignored(name):
-                continue
-
             param_refl: inspect.Parameter = self._signature.parameters[name]
             param_spec = {
                 "name": name,
@@ -204,7 +201,12 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def is_raw_response(self, response: object) -> bool:
-        pass
+        """
+        Check whether the response is raw (which would mean it doesn't need postprocessing).
+
+        :param response: the response to be checked
+        :return: True if the response is raw, False otherwise
+        """
 
     #############################
     # Helpers for child classes #
@@ -388,7 +390,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
                 yield param, annotation
 
     def _get_path_parameters(self) -> Generator[Tuple[str, Type], None, None]:
-        pass
+        """
+        Get a list of path parameters accepted by the wrapped endpoint.
+        """
 
     def _get_security_requirements(self) -> Generator[Tuple[str, Sequence[str]], None, None]:
         decorators = [*self._find_decorators(SecurityDecorator)]
