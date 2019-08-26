@@ -8,7 +8,7 @@ from typing.io import BinaryIO
 from schematics.exceptions import BaseError, CompoundError, ValidationError
 from schematics.types import FloatType, ListType
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     try:
         from aiohttp import StreamReader
     except ImportError:
@@ -107,7 +107,7 @@ class NonNanFloatType(FloatType):
     def to_native(self, value, context=None):
         try:
             import numpy as np
-        except ImportError as ex:
+        except ImportError as ex:  # pragma: no cover
             raise ImportError("NonNanFloatType requires Numpy.") from ex
 
         if np.isreal(value) and np.isscalar(value) and np.isnan(value):  # detect NaN

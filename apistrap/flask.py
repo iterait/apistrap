@@ -2,7 +2,6 @@ import inspect
 import json
 import logging
 import re
-from copy import deepcopy
 from functools import wraps
 from os import path
 from typing import Callable, Generator, List, Optional, Sequence, Tuple, Type
@@ -15,7 +14,7 @@ from apistrap.extension import Apistrap, ErrorHandler
 from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
-from apistrap.utils import format_exception, resolve_fw_decl, snake_to_camel
+from apistrap.utils import format_exception, resolve_fw_decl
 
 
 class FlaskOperationWrapper(OperationWrapper):
@@ -224,7 +223,7 @@ class FlaskApistrap(Apistrap):
         """
 
         if not isinstance(exception, HTTPException):
-            raise ValueError()
+            raise ValueError()  # pragma: no cover
 
         logging.exception(exception)
         return ErrorResponse(dict(message=exception.description))

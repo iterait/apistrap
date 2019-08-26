@@ -29,7 +29,8 @@ class ExamplesMixin:
         :return: a list of example objects of this class
         """
 
-        raise NotImplementedError()  # Using abc would lead to metaclass conflicts with Schematics
+        # Using abc would lead to metaclass conflicts with Schematics
+        raise NotImplementedError()  # pragma: no cover
 
 
 def model_examples_to_openapi_dict(model: Type[ExamplesMixin]) -> Dict[str, Any]:
