@@ -3,11 +3,10 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
-from docstring_parser import parse as parse_doc
 from schematics import Model
 
 from apistrap.decorators import (
@@ -22,9 +21,7 @@ from apistrap.decorators import (
 )
 from apistrap.errors import ApistrapExtensionError
 from apistrap.schemas import ErrorResponse
-from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.tags import TagData
-from apistrap.utils import resolve_fw_decl
 
 
 class SecurityScheme(metaclass=ABCMeta):
@@ -32,10 +29,10 @@ class SecurityScheme(metaclass=ABCMeta):
     Description of an authentication method.
     """
 
-    def __init__(self, name: str, enforcer: Callable[[List[str]], Callable]):
+    def __init__(self, name: str, enforcer: Callable[[List[str]], None]):
         """
         :param name: Name of the scheme (used as the name in the OpenAPI specification)
-        :param enforcer: A decorator that takes a list of scopes and makes sure the user has them
+        :param enforcer: A function that takes a list of scopes and raises an error if the user doesn't have them
         """
         self.name = name
         self.enforcer = enforcer

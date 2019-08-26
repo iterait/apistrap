@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from apistrap.extension import Apistrap
 
 
-@dataclass
+@dataclass(frozen=True)
 class ResponseData:
     description: Optional[str] = None
     mimetype: Optional[str] = None
@@ -388,7 +388,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             raise TypeError("Only one security decorator per view is allowed")
 
         for scheme in self._extension.security_schemes:
-            yield scheme.name
+            yield scheme.name, decorators[0].scopes
 
     def _get_tags(self) -> Generator[str, None, None]:
         for decorator in self._find_decorators(TagsDecorator):
