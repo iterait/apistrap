@@ -5,7 +5,7 @@ import re
 from copy import deepcopy
 from functools import wraps
 from os import path
-from typing import Callable, Generator, List, Sequence, Tuple, Type, Optional
+from typing import Callable, Generator, List, Optional, Sequence, Tuple, Type
 
 from flask import Blueprint, Flask, Response, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
@@ -31,7 +31,7 @@ class FlaskOperationWrapper(OperationWrapper):
     def get_decorated_function(self):
         @wraps(self._wrapped_function)
         def wrapper(*args, **kwargs):
-            # TODO security
+            self._check_security()
 
             if self.accepts_body:
                 self._check_request_content_type(request.content_type)

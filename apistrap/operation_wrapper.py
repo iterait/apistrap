@@ -14,14 +14,14 @@ from schematics.exceptions import DataError
 
 from apistrap.decorators import (
     AcceptsDecorator,
+    AcceptsFileDecorator,
     AcceptsQueryStringDecorator,
+    IgnoreParamsDecorator,
     RespondsWithDecorator,
     SecurityDecorator,
     TagsDecorator,
-    IgnoreParamsDecorator,
-    AcceptsFileDecorator,
 )
-from apistrap.errors import ApiClientError, InvalidResponseError, UnexpectedResponseError, InvalidFieldsError
+from apistrap.errors import ApiClientError, InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
 from apistrap.examples import ExamplesMixin, model_examples_to_openapi_dict
 from apistrap.schemas import ErrorResponse
 from apistrap.schematics_converters import schematics_model_to_schema_object
@@ -226,6 +226,15 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             raise InvalidFieldsError(ex.errors) from ex
 
         return {self._request_body_parameter: body}
+
+    def _check_security(self):
+        security_decorator = next(self._find_decorators(SecurityDecorator), None)
+
+        if security_decorator is None:
+            return
+
+        for scheme in self._extension.security_schemes:
+            scheme.enforcer(security_decorator.scopes)
 
     def _postprocess_response(self, response: Union[Model, Tuple[Model, int]]) -> Tuple[Model, int, Optional[str]]:
         code = None

@@ -1,6 +1,6 @@
 import pytest
 
-from apistrap.extension import OAuthSecurity, OAuthFlowDefinition
+from apistrap.extension import OAuthFlowDefinition, OAuthSecurity
 from apistrap.flask import FlaskApistrap
 
 

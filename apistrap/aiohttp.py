@@ -57,8 +57,7 @@ class AioHTTPOperationWrapper(OperationWrapper):
     def get_decorated_function(self):
         @wraps(self._wrapped_function)
         async def wrapper(request: Request):
-            for scheme, scopes in self._security.items():
-                self._extension.security_schemes[scheme].enforcer  # TODO
+            self._check_security()
 
             kwargs = {}
 
@@ -293,7 +292,7 @@ class AioHTTPApistrap(Apistrap):
         :return: an ErrorResponse instance
         """
         if not isinstance(exception, HTTPError):
-            raise ValueError()
+            raise ValueError()  # pragma: no cover
 
         logging.exception(exception)
         return ErrorResponse(dict(message=exception.text))
