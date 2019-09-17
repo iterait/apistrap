@@ -1,20 +1,26 @@
 import abc
 from abc import ABCMeta
-from typing import Callable, Dict, List, Optional, Type, Union
+from dataclasses import dataclass
+from functools import partial
+from itertools import chain
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
-from docstring_parser import parse as parse_doc
 from schematics import Model
 
 from apistrap.decorators import (
+    AcceptsDecorator,
     AcceptsFileDecorator,
+    AcceptsQueryStringDecorator,
     IgnoreDecorator,
     IgnoreParamsDecorator,
+    RespondsWithDecorator,
     SecurityDecorator,
     TagsDecorator,
 )
 from apistrap.errors import ApistrapExtensionError
+from apistrap.schemas import ErrorResponse
 from apistrap.tags import TagData
 
 
@@ -23,10 +29,10 @@ class SecurityScheme(metaclass=ABCMeta):
     Description of an authentication method.
     """
 
-    def __init__(self, name: str, enforcer: Callable[[List[str]], Callable]):
+    def __init__(self, name: str, enforcer: Callable[[List[str]], None]):
         """
         :param name: Name of the scheme (used as the name in the OpenAPI specification)
-        :param enforcer: A decorator that takes a list of scopes and makes sure the user has them
+        :param enforcer: A function that takes a list of scopes and raises an error if the user doesn't have them
         """
         self.name = name
         self.enforcer = enforcer
@@ -88,6 +94,22 @@ class OAuthSecurity(SecurityScheme):
         return {"type": "oauth2", "flows": {flow.flow_type: flow.to_openapi_dict() for flow in self.flows}}
 
 
+ExceptionType = TypeVar("ExceptionType", bound=Exception)
+
+
+@dataclass
+class ErrorHandler:
+    exception_class: Type[Exception]
+    http_code: Union[int, Callable[[Type[Exception]], int]]
+    handler: Callable[[Exception], ErrorResponse]
+
+    def get_code(self, exception_type: Type[Exception]) -> int:
+        if callable(self.http_code):
+            return self.http_code(exception_type)
+
+        return self.http_code
+
+
 class Apistrap(metaclass=ABCMeta):
     """
     An abstract ancestor for extensions that bind Apistrap to a web framework
@@ -105,6 +127,7 @@ class Apistrap(metaclass=ABCMeta):
         self._ui_url = "/apidocs"
         self._redoc_url = None
         self._use_default_error_handlers = True
+        self._error_handlers: List[ErrorHandler] = []
 
     def to_openapi_dict(self):
         """
@@ -126,6 +149,12 @@ class Apistrap(metaclass=ABCMeta):
     def _is_bound(self) -> bool:
         """
         Check whether the extension is bound to an app.
+        """
+
+    @abc.abstractmethod
+    def _get_default_error_handlers(self) -> Sequence[ErrorHandler]:
+        """
+        Get a collection of default error handlers
         """
 
     ###################
@@ -152,31 +181,50 @@ class Apistrap(metaclass=ABCMeta):
         if method.lower() not in ["get", "post", "put", "delete", "patch"]:
             return True
 
+        for decorator in self._get_decorators(handler):
+            if isinstance(decorator, IgnoreDecorator):
+                return True
+
         if getattr(handler, "apistrap_ignore", False):
             return True
 
         return False
 
-    def _parameter_annotation_to_openapi_type(self, annotation):
-        return self.PARAMETER_TYPE_MAP.get(annotation, "string")
+    def _exception_handler(self, exception_class: Type[Exception]) -> Optional[ErrorHandler]:
+        if self.use_default_error_handlers:
+            handlers = chain(self._error_handlers, self._get_default_error_handlers())
+        else:
+            handlers = self._error_handlers
 
-    def _summary_from_docblock(self, docblock: Optional[str]) -> str:
-        if docblock is None:
-            return ""
+        for handler in handlers:
+            if issubclass(exception_class, handler.exception_class):
+                return handler
 
-        return parse_doc(docblock).short_description
+        return None
 
-    def _parameters_from_docblock(self, docblock: Optional[str]) -> Dict[str, str]:
-        if docblock is None:
-            return {}
+    def exception_to_http_code(self, exception_class: Type[Exception]) -> Optional[int]:
+        handler = self._exception_handler(exception_class)
 
-        return {
-            param.arg_name: param.description for param in parse_doc(docblock).params if param.description.strip() != ""
-        }
+        if handler is None:
+            return 500
 
-    ############################
-    # Configuration properties #
-    ############################
+        return handler.get_code(exception_class)
+
+    def exception_to_response(self, exception: Exception) -> Optional[Tuple[ErrorResponse, int]]:
+        handler = self._exception_handler(type(exception))
+
+        if handler is None:
+            return None
+
+        return handler.handler(exception), handler.get_code(type(exception))
+
+    @property
+    def has_error_handlers(self) -> bool:
+        return self.use_default_error_handlers or self._error_handlers
+
+    ########################################
+    # Configuration methods and properties #
+    ########################################
 
     @property
     def title(self) -> str:
@@ -239,6 +287,19 @@ class Apistrap(metaclass=ABCMeta):
     def use_default_error_handlers(self, value: bool):
         self._ensure_not_bound("You cannot change the error handler settings after binding the extension with an app")
         self._use_default_error_handlers = value
+
+    def add_error_handler(
+        self,
+        exception_class: Type[ExceptionType],
+        http_code: Union[int, Callable[[Type[ExceptionType]], int]],
+        handler: Callable[[ExceptionType], ErrorResponse],
+    ) -> None:
+        """
+        Add an error handler function.
+        """
+
+        self._ensure_not_bound("You cannot add error handlers after binding the extension with an app")
+        self._error_handlers.append(ErrorHandler(exception_class, http_code, handler))
 
     ###################################
     # Component definition management #
@@ -322,34 +383,50 @@ class Apistrap(metaclass=ABCMeta):
             self.spec.tag(tag.to_dict())
 
     #######################
+    # Decorator utilities #
+    #######################
+
+    DECORATORS_ATTR = "__apistrap_decorators"
+
+    def _decorate(self, decorator: object, function: Callable):
+        if not hasattr(function, self.DECORATORS_ATTR):
+            setattr(function, self.DECORATORS_ATTR, [])
+
+        self._get_decorators(function).append(decorator)
+
+        return function
+
+    def _get_decorators(self, function: Callable):
+        return getattr(function, self.DECORATORS_ATTR, [])
+
+    #######################
     # Decorator factories #
     #######################
 
-    def tags(self, *tags: Union[str, TagData]) -> TagsDecorator:
+    def tags(self, *tags: Union[str, TagData]):
         """
         A decorator that adds tags to the OpenAPI specification of the decorated view function.
         """
-        return TagsDecorator(self, tags)
+        return partial(self._decorate, TagsDecorator(tags))
 
     def ignore(self):
         """
         A decorator that marks an endpoint as ignored so that the extension won't include it in the specification.
         """
-        return IgnoreDecorator()
+        return partial(self._decorate, IgnoreDecorator())
 
     def ignore_params(self, *ignored_params: str):
         """
         A decorator that tells Apistrap to ignore given parameter names when generating documentation for an operation.
         """
-        return IgnoreParamsDecorator(ignored_params)
+        return partial(self._decorate, IgnoreParamsDecorator(ignored_params))
 
     def security(self, *scopes: str):
         """
         A decorator that enforces user authentication and authorization.
         """
-        return SecurityDecorator(self, scopes)
+        return partial(self._decorate, SecurityDecorator(scopes))
 
-    @abc.abstractmethod
     def responds_with(
         self,
         response_class: Type[Model],
@@ -362,16 +439,23 @@ class Apistrap(metaclass=ABCMeta):
         A decorator that fills in response schemas in the Swagger specification. It also converts Schematics models
         returned by view functions to JSON and validates them.
         """
+        return partial(self._decorate, RespondsWithDecorator(response_class, code, description, mimetype))
 
-    @abc.abstractmethod
     def accepts(self, request_class: Type[Model]):
         """
         A decorator that validates request bodies against a schema and passes it as an argument to the view function.
         The destination argument must be annotated with the request type.
         """
+        return partial(self._decorate, AcceptsDecorator(request_class))
 
-    def accepts_file(self, mime_type: str = None):
+    def accepts_file(self, mime_type: str = "application/octet-stream"):
         """
         A decorator used to declare that an endpoint accepts a file as the request body.
         """
-        return AcceptsFileDecorator(mime_type)
+        return partial(self._decorate, AcceptsFileDecorator(mime_type))
+
+    def accepts_qs(self, *parameter_names: str):
+        """
+        A decorator used to declare that an endpoint accepts query string parameters.
+        """
+        return partial(self._decorate, AcceptsQueryStringDecorator(parameter_names))

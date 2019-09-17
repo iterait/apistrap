@@ -11,18 +11,6 @@ from apistrap.examples import ExamplesMixin, ModelExample
 from apistrap.flask import FlaskApistrap
 
 
-@pytest.fixture(scope="function")
-def app_with_examples(app):
-    oapi = FlaskApistrap()
-    oapi.init_app(app)
-
-    @app.route('/view', methods=["GET"])
-    @oapi.accepts(ModelWithExamples)
-    @oapi.responds_with(ModelWithExamples)
-    def view(body: ModelWithExamples):
-        return jsonify()
-
-
 class ModelWithExamples(Model, ExamplesMixin):
     string = StringType()
     int = IntType()
@@ -39,6 +27,18 @@ class ModelWithExamples(Model, ExamplesMixin):
                 "int": 999
             }))
         ]
+
+
+@pytest.fixture(scope="function")
+def app_with_examples(app):
+    oapi = FlaskApistrap()
+    oapi.init_app(app)
+
+    @app.route('/view', methods=["GET"])
+    @oapi.accepts(ModelWithExamples)
+    @oapi.responds_with(ModelWithExamples)
+    def view(body: ModelWithExamples):
+        return jsonify()
 
 
 def test_examples(client, app_with_examples):
