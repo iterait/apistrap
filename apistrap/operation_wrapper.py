@@ -234,6 +234,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
     def _load_request_body(self, body_primitive) -> Dict[str, Model]:
         """
         Load the request body as an object with a fixed schema from a primitive data object (dict structure).
+
         :param body_primitive: the request body as a primitive object
         :return: the request body as an object of a request class
         """
@@ -265,6 +266,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
     def _postprocess_response(self, response: Union[Model, Tuple[Model, int]]) -> Tuple[Model, int, Optional[str]]:
         """
         Check response type and code and add the code if necessary.
+        
         :param response: response received from a view handler
         :return: a response and status code
         """
