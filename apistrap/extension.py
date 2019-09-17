@@ -1,26 +1,27 @@
 import abc
 from abc import ABCMeta
 from dataclasses import dataclass
+from functools import partial
 from itertools import chain
-from typing import Callable, Dict, List, Optional, Type, Union, TypeVar, Tuple, cast, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
-from docstring_parser import parse as parse_doc
 from schematics import Model
 
 from apistrap.decorators import (
+    AcceptsDecorator,
     AcceptsFileDecorator,
+    AcceptsQueryStringDecorator,
     IgnoreDecorator,
     IgnoreParamsDecorator,
+    RespondsWithDecorator,
     SecurityDecorator,
     TagsDecorator,
 )
 from apistrap.errors import ApistrapExtensionError
 from apistrap.schemas import ErrorResponse
-from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.tags import TagData
-from apistrap.utils import resolve_fw_decl
 
 
 class SecurityScheme(metaclass=ABCMeta):
@@ -28,10 +29,10 @@ class SecurityScheme(metaclass=ABCMeta):
     Description of an authentication method.
     """
 
-    def __init__(self, name: str, enforcer: Callable[[List[str]], Callable]):
+    def __init__(self, name: str, enforcer: Callable[[List[str]], None]):
         """
         :param name: Name of the scheme (used as the name in the OpenAPI specification)
-        :param enforcer: A decorator that takes a list of scopes and makes sure the user has them
+        :param enforcer: A function that takes a list of scopes and raises an error if the user doesn't have them
         """
         self.name = name
         self.enforcer = enforcer
@@ -180,53 +181,14 @@ class Apistrap(metaclass=ABCMeta):
         if method.lower() not in ["get", "post", "put", "delete", "patch"]:
             return True
 
+        for decorator in self._get_decorators(handler):
+            if isinstance(decorator, IgnoreDecorator):
+                return True
+
         if getattr(handler, "apistrap_ignore", False):
             return True
 
         return False
-
-    def _parameter_annotation_to_openapi_type(self, annotation):
-        return self.PARAMETER_TYPE_MAP.get(annotation, "string")
-
-    def _parameters_from_docblock(self, docblock: Optional[str]) -> Dict[str, str]:
-        return {
-            param.arg_name: param.description for param in parse_doc(docblock).params if param.description.strip() != ""
-        }
-
-    def _error_responses_from_docblock(self, handler: Callable):
-        result = {}
-
-        for item in parse_doc(handler.__doc__).raises:
-            exception_type = cast(Type[Exception], resolve_fw_decl(handler, item.type_name))
-            code = self.exception_to_http_code(exception_type)
-
-            if code is None:
-                continue
-
-            result[code] = {
-                "description": item.description,
-                "content": {
-                    "application/json": {
-                        "type": "object",
-                        "schema": {
-                            "$ref": self.add_schema_definition(
-                                "ErrorResponse", schematics_model_to_schema_object(ErrorResponse)
-                            )
-                        },
-                    }
-                },
-            }
-
-        return result
-
-    def _descriptions_from_docblock(self, docblock: Optional[str], target: dict):
-        if docblock is None:
-            return {}
-
-        parsed = parse_doc(docblock)
-
-        target["summary"] = parsed.short_description
-        target["description"] = parsed.long_description
 
     def _exception_handler(self, exception_class: Type[Exception]) -> Optional[ErrorHandler]:
         if self.use_default_error_handlers:
@@ -260,9 +222,9 @@ class Apistrap(metaclass=ABCMeta):
     def has_error_handlers(self) -> bool:
         return self.use_default_error_handlers or self._error_handlers
 
-    ############################
-    # Configuration properties #
-    ############################
+    ########################################
+    # Configuration methods and properties #
+    ########################################
 
     @property
     def title(self) -> str:
@@ -421,34 +383,50 @@ class Apistrap(metaclass=ABCMeta):
             self.spec.tag(tag.to_dict())
 
     #######################
+    # Decorator utilities #
+    #######################
+
+    DECORATORS_ATTR = "__apistrap_decorators"
+
+    def _decorate(self, decorator: object, function: Callable):
+        if not hasattr(function, self.DECORATORS_ATTR):
+            setattr(function, self.DECORATORS_ATTR, [])
+
+        self._get_decorators(function).append(decorator)
+
+        return function
+
+    def _get_decorators(self, function: Callable):
+        return getattr(function, self.DECORATORS_ATTR, [])
+
+    #######################
     # Decorator factories #
     #######################
 
-    def tags(self, *tags: Union[str, TagData]) -> TagsDecorator:
+    def tags(self, *tags: Union[str, TagData]):
         """
         A decorator that adds tags to the OpenAPI specification of the decorated view function.
         """
-        return TagsDecorator(self, tags)
+        return partial(self._decorate, TagsDecorator(tags))
 
     def ignore(self):
         """
         A decorator that marks an endpoint as ignored so that the extension won't include it in the specification.
         """
-        return IgnoreDecorator()
+        return partial(self._decorate, IgnoreDecorator())
 
     def ignore_params(self, *ignored_params: str):
         """
         A decorator that tells Apistrap to ignore given parameter names when generating documentation for an operation.
         """
-        return IgnoreParamsDecorator(ignored_params)
+        return partial(self._decorate, IgnoreParamsDecorator(ignored_params))
 
     def security(self, *scopes: str):
         """
         A decorator that enforces user authentication and authorization.
         """
-        return SecurityDecorator(self, scopes)
+        return partial(self._decorate, SecurityDecorator(scopes))
 
-    @abc.abstractmethod
     def responds_with(
         self,
         response_class: Type[Model],
@@ -461,16 +439,23 @@ class Apistrap(metaclass=ABCMeta):
         A decorator that fills in response schemas in the Swagger specification. It also converts Schematics models
         returned by view functions to JSON and validates them.
         """
+        return partial(self._decorate, RespondsWithDecorator(response_class, code, description, mimetype))
 
-    @abc.abstractmethod
     def accepts(self, request_class: Type[Model]):
         """
         A decorator that validates request bodies against a schema and passes it as an argument to the view function.
         The destination argument must be annotated with the request type.
         """
+        return partial(self._decorate, AcceptsDecorator(request_class))
 
-    def accepts_file(self, mime_type: str = None):
+    def accepts_file(self, mime_type: str = "application/octet-stream"):
         """
         A decorator used to declare that an endpoint accepts a file as the request body.
         """
-        return AcceptsFileDecorator(mime_type)
+        return partial(self._decorate, AcceptsFileDecorator(mime_type))
+
+    def accepts_qs(self, *parameter_names: str):
+        """
+        A decorator used to declare that an endpoint accepts query string parameters.
+        """
+        return partial(self._decorate, AcceptsQueryStringDecorator(parameter_names))

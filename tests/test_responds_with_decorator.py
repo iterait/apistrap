@@ -69,6 +69,24 @@ def app_with_responds_with(app, flask_apistrap):
     def get_empty_response():
         return EmptyResponse()
 
+    @app.route("/multiple")
+    @flask_apistrap.responds_with(EmptyResponse, code=200)
+    @flask_apistrap.responds_with(EmptyResponse, code=201)
+    def get_multiple_responses():
+        return EmptyResponse(), 201
+
+    @app.route("/multiple_missing_code")
+    @flask_apistrap.responds_with(EmptyResponse, code=200)
+    @flask_apistrap.responds_with(EmptyResponse, code=201)
+    def get_multiple_responses_missing_code():
+        return EmptyResponse()
+
+    @app.route("/unexpected_code")
+    @flask_apistrap.responds_with(EmptyResponse, code=200)
+    @flask_apistrap.responds_with(EmptyResponse, code=201)
+    def get_multiple_responses_unexpected_code():
+        return EmptyResponse(), 300
+
 
 def test_responses_in_spec_json(app_with_responds_with, client):
     response = client.get("/spec.json")
@@ -150,3 +168,19 @@ def test_empty_response(app_with_responds_with, client):
     response = client.get("/empty")
     assert response.status_code == 200
     assert response.json == {}
+
+
+def test_multiple_responses(app_with_responds_with, client):
+    response = client.get("/multiple")
+    assert response.status_code == 201
+    assert response.json == {}
+
+
+def test_multiple_responses_missing_code(app_with_responds_with, client, propagate_exceptions):
+    with pytest.raises(InvalidResponseError):
+        client.get("/multiple_missing_code")
+
+
+def test_multiple_responses_unexpected_code(app_with_responds_with, client, propagate_exceptions):
+    with pytest.raises(UnexpectedResponseError):
+        client.get("/unexpected_code")

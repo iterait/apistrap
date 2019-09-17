@@ -34,8 +34,12 @@ class UnexpectedResponseError(ApiServerError):
     An exception raised when a view function returns a response of an unexpected type
     """
 
-    def __init__(self, response_class: type):
-        super().__init__(f"Unexpected response class: `{response_class.__name__}`")
+    def __init__(self, response_class: type, code: int = None):
+        msg = f"Unexpected response class: `{response_class.__name__}`"
+        if code is not None:
+            msg += f" (status code {code})"
+
+        super().__init__(msg)
 
 
 class InvalidResponseError(ApiServerError):

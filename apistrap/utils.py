@@ -1,7 +1,6 @@
 import inspect
-import sys
 import traceback
-from typing import Any, Mapping, Callable, Dict, Optional, Type, Union
+from typing import Any, Callable, Dict, Mapping, Type, Union
 
 from more_itertools import flatten
 

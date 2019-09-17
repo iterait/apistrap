@@ -3,11 +3,10 @@ import json
 import logging
 import mimetypes
 import re
-from copy import deepcopy
-from itertools import chain
+from functools import wraps
 from os import path
 from pathlib import Path
-from typing import Any, Callable, Coroutine, List, Optional, Tuple, Type, Sequence
+from typing import Any, Callable, Coroutine, Generator, List, Optional, Sequence, Tuple, Type
 
 import jinja2
 from aiohttp import StreamReader, web
@@ -15,96 +14,173 @@ from aiohttp.web_exceptions import HTTPError
 from aiohttp.web_request import BaseRequest, Request
 from aiohttp.web_response import Response
 from aiohttp.web_urldispatcher import AbstractRoute, DynamicResource, PlainResource
-from schematics import Model
-from schematics.exceptions import DataError
 
-from apistrap.decorators import AcceptsDecorator, RespondsWithDecorator
-from apistrap.errors import ApiClientError, InvalidResponseError, UnexpectedResponseError
+from apistrap.errors import ApiClientError
 from apistrap.extension import Apistrap, ErrorHandler
+from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
-from apistrap.utils import format_exception, snake_to_camel, get_type_hints
+from apistrap.utils import format_exception, resolve_fw_decl
 
 
-class AioHTTPRespondsWithDecorator(RespondsWithDecorator):
-    async def _process_response(self, response, is_last_decorator: bool, *args, **kwargs):
-        if isinstance(response, Response) or isinstance(response, web.StreamResponse):
-            return response
-        if isinstance(response, FileResponse):
-            # TODO consider implementing add_etags, cache_timeout and conditional
-            headers = {}
+class AioHTTPOperationWrapper(OperationWrapper):
+    def __init__(self, extension: Apistrap, function: Callable, decorators: Sequence[object], route: AbstractRoute):
+        self.route = route
+        super().__init__(extension, function, decorators)
 
-            if self._mimetype:
-                headers["Content-Type"] = self._mimetype
-            elif response.mimetype:
-                headers["Content-Type"] = response.mimetype
-            elif response.attachment_filename:
-                headers["Content-Type"] = mimetypes.guess_type(response.attachment_filename)[0]
+    def process_metadata(self):
+        super().process_metadata()
+        self._get_aiohttp_request_param_name()
 
-            if response.last_modified is not None:
-                headers["Last-Modified"] = str(response.last_modified)
+    def _get_aiohttp_request_param_name(self) -> Optional[str]:
+        """
+        Find the parameter into which the AioHTTP request object should be injected.
+        """
 
-            if response.as_attachment:
-                if response.attachment_filename is None:
-                    raise TypeError("Missing attachment filename")
+        param: inspect.Parameter
+        result = None
+        for param in self._signature.parameters.values():
+            if param.annotation == inspect.Parameter.empty:
+                continue
 
-                headers["Content-Disposition"] = f"attachment,filename={response.attachment_filename}"
+            annotation = resolve_fw_decl(self._wrapped_function, param.annotation)
+            if issubclass(annotation, BaseRequest):
+                if result is not None:
+                    raise TypeError("Multiple candidates for request parameter")
+                result = param.name
 
-            if isinstance(response.filename_or_fp, str) or isinstance(response.filename_or_fp, Path):
-                return web.FileResponse(response.filename_or_fp, headers=headers)
-            else:
-                stream = web.StreamResponse(headers=headers)
-                request = next(filter(lambda a: isinstance(a, BaseRequest), chain(args, kwargs.values())), None)
+        if result is not None:
+            return result
 
-                if request is None:
-                    raise TypeError("No request passed to view function")
+        if "request" in self._signature.parameters.keys():
+            if self._signature.parameters["request"].annotation == inspect.Parameter.empty:
+                return "request"
 
-                await stream.prepare(request)
-                buffer_size = 16536
+        return None
 
-                while True:
-                    if isinstance(response.filename_or_fp, StreamReader):
-                        chunk = await response.filename_or_fp.read(buffer_size)
-                    else:
-                        chunk = response.filename_or_fp.read(buffer_size)
+    def get_decorated_function(self):
+        @wraps(self._wrapped_function)
+        async def wrapper(request: Request):
+            self._check_security()
 
-                    if not chunk:
-                        await stream.write_eof()
-                        break
+            kwargs = {}
 
-                    await stream.write(chunk)
+            if self.accepts_body:
+                self._check_request_content_type(request.content_type)
 
-                return stream
+                try:
+                    data = await request.json()
+                except json.decoder.JSONDecodeError as ex:
+                    raise ApiClientError("The request body must be a JSON object") from ex
 
-        if not isinstance(response, self._response_class):
-            if is_last_decorator:
-                raise UnexpectedResponseError(type(response))
-            return response  # Let's hope the next RespondsWithDecorator takes care of the response
+                if isinstance(data, str):
+                    raise ApiClientError("The request body must be a JSON object")
 
-        try:
-            response.validate()
-        except DataError as e:
-            raise InvalidResponseError(e.errors) from e
+                kwargs.update(self._load_request_body(data))
 
-        return web.Response(
-            text=json.dumps(response.to_primitive()), content_type="application/json", status=self._code
-        )
+            for name, param_type in self._path_parameters.items():
+                if name in request.match_info.keys():
+                    kwargs[name] = param_type(request.match_info[name])
 
+            for name, param_type in self._query_parameters.items():
+                if name in request.rel_url.query.keys():
+                    kwargs[name] = param_type(request.query[name])
+                elif self._signature.parameters[name].default == inspect.Parameter.empty:
+                    raise ApiClientError(f"Missing query parameter `{name}`")
 
-class AioHTTPAcceptsDecorator(AcceptsDecorator):
-    def _get_request_content_type(self, request: BaseRequest, *args, **kwargs):
-        return request.content_type
+            request_param_name = self._get_aiohttp_request_param_name()
+            if request_param_name is not None:
+                kwargs[request_param_name] = request
 
-    async def _get_request_json(self, request: BaseRequest, *args, **kwargs):
-        try:
-            data = await request.json()
-        except json.decoder.JSONDecodeError as ex:
-            raise ApiClientError("The request body must be a JSON object") from ex
+            bound = self._signature.bind(**kwargs)
 
-        if isinstance(data, str):
-            raise ApiClientError("The request body must be a JSON object")
+            response, code, mimetype = self._postprocess_response(
+                await self._wrapped_function(*bound.args, **bound.kwargs)
+            )
 
-        return data
+            if self.is_raw_response(response):
+                response.set_status(code)
+                return response
+
+            if isinstance(response, FileResponse):
+                return await self._stream_file_response(request, response, code, mimetype)
+
+            return web.Response(text=json.dumps(response.to_primitive()), content_type="application/json", status=code)
+
+        return wrapper
+
+    async def _stream_file_response(
+        self, request: BaseRequest, response: FileResponse, code: int, mimetype: str = None
+    ):
+        """
+        Stream a file response to the client
+        """
+
+        # TODO consider implementing add_etags, cache_timeout and conditional
+        headers = {}
+
+        if mimetype:
+            headers["Content-Type"] = mimetype
+        elif response.mimetype:
+            headers["Content-Type"] = response.mimetype
+        elif response.attachment_filename:
+            headers["Content-Type"] = mimetypes.guess_type(response.attachment_filename)[0]
+
+        if response.last_modified is not None:
+            headers["Last-Modified"] = str(response.last_modified)
+
+        if response.as_attachment:
+            if response.attachment_filename is None:
+                raise TypeError("Missing attachment filename")
+
+            headers["Content-Disposition"] = f"attachment,filename={response.attachment_filename}"
+
+        if isinstance(response.filename_or_fp, str) or isinstance(response.filename_or_fp, Path):
+            return web.FileResponse(response.filename_or_fp, headers=headers, status=code)
+        else:
+            # The response contains a file object - stream it to the client
+            stream = web.StreamResponse(headers=headers, status=code)
+
+            await stream.prepare(request)
+            buffer_size = 16536
+
+            while True:
+                if isinstance(response.filename_or_fp, StreamReader):
+                    chunk = await response.filename_or_fp.read(buffer_size)
+                else:
+                    chunk = response.filename_or_fp.read(buffer_size)
+
+                if not chunk:
+                    await stream.write_eof()
+                    break
+
+                await stream.write(chunk)
+
+            return stream
+
+    def _get_path_parameters(self) -> Generator[Tuple[str, Type], None, None]:
+        if not isinstance(self.route.resource, DynamicResource):
+            return
+
+        for name in re.findall(r"{([a-zA-Z0-9]+[^}]*)}", self.route.resource.get_info()["formatter"]):
+            param_type = str
+
+            if name not in self._signature.parameters.keys():
+                yield name, param_type
+                continue
+
+            param_refl: inspect.Parameter = self._signature.parameters[name]
+
+            if param_refl.annotation != inspect.Parameter.empty and param_refl.annotation is not None:
+                param_type = resolve_fw_decl(self._wrapped_function, param_refl.annotation)
+
+            if param_type not in (str, int):
+                raise TypeError(f"Unsupported path parameter type `{param_type.__name__}`")
+
+            yield name, param_type
+
+    def is_raw_response(self, response: object) -> bool:
+        return isinstance(response, Response) or isinstance(response, web.StreamResponse)
 
 
 @web.middleware
@@ -155,8 +231,6 @@ class ErrorHandlerMiddleware:
 
 
 class AioHTTPApistrap(Apistrap):
-    SYNTHETIC_WRAPPER_ATTR = "aiohttp_apistrap_wrapped_function"
-
     def __init__(self):
         super().__init__()
         self.app: web.Application = None
@@ -226,7 +300,7 @@ class AioHTTPApistrap(Apistrap):
         :return: an ErrorResponse instance
         """
         if not isinstance(exception, HTTPError):
-            raise ValueError()
+            raise ValueError()  # pragma: no cover
 
         logging.exception(exception)
         return ErrorResponse(dict(message=exception.text))
@@ -269,165 +343,35 @@ class AioHTTPApistrap(Apistrap):
         Process all non-ignored routes and their parameters
         """
 
-        self._extract_specs()
+        operations = [
+            AioHTTPOperationWrapper(self, route._handler, self._get_decorators(route._handler), route)
+            for route in self.app.router.routes()
+            if not self._is_route_ignored(route.method, route._handler)
+        ]
 
-        for route in self.app.router.routes():
-            if self._is_route_ignored(route.method, route.handler):
-                continue
+        self._extract_specs(operations)
 
-            self._process_route_parameters(route)
+        for op in operations:
+            op.route._handler = op.get_decorated_function()
 
-    def _extract_specs(self) -> None:
+    def _extract_specs(self, operations: List[AioHTTPOperationWrapper]) -> None:
         """
         Extract the specification data from the bound AioHTTP app. If the data was already extracted, do not do
         anything.
         """
 
-        route: AbstractRoute
-        for route in self.app.router.routes():
-            if self._is_route_ignored(route.method, route.handler):
-                continue
-
+        for op in operations:
             url = ""
 
-            if isinstance(route.resource, PlainResource):
-                url = route.resource.get_info()["path"]
-            elif isinstance(route.resource, DynamicResource):
-                url = route.resource.get_info()["formatter"]
+            if isinstance(op.route.resource, PlainResource):
+                url = op.route.resource.get_info()["path"]
+            elif isinstance(op.route.resource, DynamicResource):
+                url = op.route.resource.get_info()["formatter"]
 
-            self.spec.path(url, {route.method.lower(): self._extract_operation_spec(route)})
-
-    def _check_parameter_type(self, parameter_type: Optional[type]):
-        """
-        Make sure that given parameter is annotated with a supported type
-
-        :param parameter_type: type of the parameter to check
-        :raises TypeError: on unsupported parameters
-        """
-
-        if parameter_type not in (str, int, None):
-            raise TypeError("Unsupported parameter type")
-
-    def _process_route_parameters(self, route: AbstractRoute) -> None:
-        """
-        If necessary, wrap the route handler with a coroutine that accepts a AioHTTP request, extracts parameters to
-        satisfy the underlying handler and forwards them to the original handler.
-
-        :param route: the route whose handler should be wrapped
-        """
-
-        signature = inspect.signature(route.handler)
-
-        request_params = [*filter(lambda hint: issubclass(hint[1], BaseRequest), get_type_hints(route.handler).items())]
-        request_param_name: Optional[str] = request_params[0][0] if request_params else None
-
-        if len(request_params) > 1:
-            raise TypeError("The decorated view has more than one possible parameter for the AioHTTP request")
-
-        if (
-            request_param_name is None
-            and "request" in signature.parameters.keys()
-            and signature.parameters["request"].annotation == inspect.Signature.empty
-        ):
-            request_param_name = signature.parameters["request"].name
-
-        takes_aiohttp_request = request_param_name is not None
-
-        additional_params: List[str] = [
-            *filter(lambda p: not takes_aiohttp_request or p != request_param_name, signature.parameters.keys())
-        ]
-
-        if not takes_aiohttp_request or additional_params:
-            handler = route.handler
-            accepted_path_params = set(self._get_route_parameter_names(route)).intersection(additional_params)
-            type_hints = get_type_hints(route.handler)
-
-            for param in accepted_path_params:
-                self._check_parameter_type(type_hints.get(param, None))
-
-            async def wrapped_handler(request: Request):
-                kwargs = {
-                    name: type_hints[name](request.match_info[name]) if name in type_hints else request.match_info[name]
-                    for name in accepted_path_params
-                }
-
-                if takes_aiohttp_request:
-                    kwargs[request_param_name] = request
-
-                bound_args: inspect.BoundArguments = signature.bind_partial(**kwargs)
-
-                return await handler(*bound_args.args, **bound_args.kwargs)
-
-            setattr(wrapped_handler, self.SYNTHETIC_WRAPPER_ATTR, handler)
-
-            route._handler = wrapped_handler  # HACK
-
-    def _extract_operation_spec(self, route: AbstractRoute) -> dict:
-        """
-        Extract specification data for a single operation.
-
-        :param route: the route for the operation
-        :return: a dict with specification data
-        """
-
-        handler = getattr(route.handler, self.SYNTHETIC_WRAPPER_ATTR, route.handler)
-
-        specs_dict = deepcopy(getattr(handler, "specs_dict", {"parameters": [], "responses": {}}))
-        specs_dict["operationId"] = snake_to_camel(handler.__name__)
-
-        self._descriptions_from_docblock(handler.__doc__, specs_dict)
-        specs_dict["responses"].update(self._error_responses_from_docblock(handler))
-
-        signature = inspect.signature(handler)
-        param_doc = self._parameters_from_docblock(handler.__doc__)
-
-        for param_name in self._get_route_parameter_names(route):
-            parameter = signature.parameters.get(param_name, None)
-            annotation = parameter.annotation if parameter else None
-
-            parameter = {
-                "in": "path",
-                "name": param_name,
-                "required": True,
-                "schema": {"type": self._parameter_annotation_to_openapi_type(annotation)},
-            }
-
-            if param_name in param_doc.keys():
-                parameter["description"] = param_doc[param_name]
-
-            specs_dict["parameters"].append(parameter)
-
-        return specs_dict
-
-    def _get_route_parameter_names(self, route: AbstractRoute) -> List[str]:
-        if not isinstance(route.resource, DynamicResource):
-            return []
-
-        return re.findall(r"{([a-zA-Z0-9]+[^}]*)}", route.resource.get_info()["formatter"])
+            self.spec.path(url, {op.route.method.lower(): op.get_openapi_spec()})
 
     def _is_bound(self) -> bool:
         return self.app is not None
 
     def _get_default_error_handlers(self) -> Sequence[ErrorHandler]:
         return self._default_error_handlers
-
-    def responds_with(
-        self,
-        response_class: Type[Model],
-        *,
-        code: int = 200,
-        description: Optional[str] = None,
-        mimetype: Optional[str] = None,
-    ):
-        """
-        A decorator that fills in response schemas in the OpenAPI specification. It also converts Schematics models
-        returned by view functions to JSON and validates them.
-        """
-        return AioHTTPRespondsWithDecorator(self, response_class, code=code, description=description, mimetype=mimetype)
-
-    def accepts(self, request_class: Type[Model]):
-        """
-        A decorator that validates request bodies against a schema and passes it as an argument to the view function.
-        The destination argument must be annotated with the request type.
-        """
-        return AioHTTPAcceptsDecorator(self, request_class)

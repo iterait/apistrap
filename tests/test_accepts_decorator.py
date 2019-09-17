@@ -35,7 +35,6 @@ def test_parameters_in_spec_json(app_with_accepts, client):
     assert "schemas" in response.json["components"]
 
     path = response.json["paths"]["/"]["post"]
-    assert "parameters" in path
 
     body = path["requestBody"]
     assert body is not None
@@ -119,17 +118,19 @@ def test_correct_parameters(app_with_arg, client: Client):
     assert path["requestBody"] is not None
 
 
-def test_no_injection_parameter(app, flask_apistrap):
+def test_no_injection_parameter(app, flask_apistrap, client):
     """
     If the `accepts` decorator is applied to a function that has no parameter with a type annotation corresponding to
     the request type, an exception should be thrown.
     """
 
+    @app.route("/", methods=["GET"])
+    @flask_apistrap.accepts(Request)
     def view():
         return jsonify()
 
     with pytest.raises(TypeError):
-        flask_apistrap.accepts(Request)(view)
+        client.get("/spec.json")
 
 
 def test_invalid_json(app_with_accepts, flask_apistrap, client):
