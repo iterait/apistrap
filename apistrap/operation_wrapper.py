@@ -49,6 +49,13 @@ class OperationWrapper(metaclass=abc.ABCMeta):
     """
 
     def __init__(self, extension: Apistrap, function: Callable, decorators: Sequence[object]):
+        """
+        Initialize an operation wrapper
+
+        :param extension: The extension that instantiated the wrapper
+        :param function: The view handler function to be processed
+        :param decorators: The decorators present on the function
+        """
         self._responses: Dict[Type[Model], Dict[int, ResponseData]] = defaultdict(lambda: {})
         self._request_body_class: Optional[Type[Model]] = None
         self._request_body_parameter: Optional[str] = None
@@ -67,6 +74,10 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         self.process_metadata()
 
     def process_metadata(self):
+        """
+        Load metadata from the view handler function.
+        """
+
         self._responses = self._get_responses()
 
         self._request_body_parameter, self._request_body_class = self._get_request_body_parameter()
@@ -193,6 +204,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_decorated_function(self):
         """
+        Return the view handler decorated with functionality added by Apistrap.
         """
 
     ######################################
@@ -214,9 +226,17 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
     @property
     def accepts_body(self):
+        """
+        Does the underlying endpoint accept a body parameter
+        """
         return self._request_body_parameter is not None
 
     def _load_request_body(self, body_primitive) -> Dict[str, Model]:
+        """
+        Load the request body as an object with a fixed schema from a primitive data object (dict structure).
+        :param body_primitive: the request body as a primitive object
+        :return: the request body as an object of a request class
+        """
         if self._request_body_parameter is None or self._request_body_class is None:
             raise ValueError("The endpoint doesn't accept a request body")
 
@@ -230,6 +250,10 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         return {self._request_body_parameter: body}
 
     def _check_security(self):
+        """
+        Ensure security policies are met.
+        """
+
         security_decorator = next(self._find_decorators(SecurityDecorator), None)
 
         if security_decorator is None:
@@ -239,6 +263,11 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             scheme.enforcer(security_decorator.scopes)
 
     def _postprocess_response(self, response: Union[Model, Tuple[Model, int]]) -> Tuple[Model, int, Optional[str]]:
+        """
+        Check response type and code and add the code if necessary.
+        :param response: response received from a view handler
+        :return: a response and status code
+        """
         code = None
 
         if isinstance(response, tuple):
@@ -267,6 +296,12 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         return response, code, self._responses[type(response)][code].mimetype
 
     def _get_param_doc(self, param_name: str) -> Optional[DocstringParam]:
+        """
+        Get parameter documentation from the docblock of the underlying view handler function.
+
+        :param param_name: name of the parameter
+        :return: the parameter documentation
+        """
         for param in self._doc.params:
             if param.arg_name == param_name:
                 return param
@@ -274,6 +309,12 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         return None
 
     def _check_request_content_type(self, content_type: str):
+        """
+        Make sure that received content type is supported by the underlying view handler.
+
+        :param content_type: name of the received content type (e.g. 'text/plain')
+        """
+
         if content_type != "application/json":
             raise ApiClientError("Unsupported media type, JSON is expected")
 
@@ -282,11 +323,17 @@ class OperationWrapper(metaclass=abc.ABCMeta):
     ###################################
 
     def _find_decorators(self, decorator_class: Type[DecoratorType]) -> Generator[DecoratorType, None, None]:
+        """
+        Look up decorators of the view handler by type.
+        """
         for decorator in self._decorators:
             if isinstance(decorator, decorator_class):
                 yield decorator
 
     def _get_responses(self):
+        """
+        Find all possible response classes and codes for the underyling endpoint.
+        """
         result: Dict[Type[Model], Dict[int, ResponseData]] = defaultdict(lambda: {})
 
         for response_class, code, data in chain(
@@ -302,6 +349,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         return result
 
     def _get_response_from_annotation(self) -> Generator[Tuple[Type[Model], int, ResponseData], None, None]:
+        """
+        Get the response class specified by the return value annotation of the view handler.
+        """
         annotation = self._signature.return_annotation
 
         if annotation is inspect.Signature.empty:
@@ -315,10 +365,16 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         yield annotation, 200, ResponseData(self._doc.returns.description if self._doc.returns else None)
 
     def _get_responses_from_decorators(self) -> Generator[Tuple[Type[Model], int, ResponseData], None, None]:
+        """
+        Get the response classes specified by @responds_with decorators.
+        """
         for decorator in self._find_decorators(RespondsWithDecorator):
             yield decorator.response_class, decorator.code, ResponseData(decorator.description, decorator.mimetype)
 
     def _get_responses_from_raises(self) -> Generator[Tuple[Type[Model], int, ResponseData], None, None]:
+        """
+        Get response classes specified by 'raises' blocks in the docblock of the view handler.
+        """
         for item in self._doc.raises:
             exception_type = cast(Type[Exception], resolve_fw_decl(self._wrapped_function, item.type_name))
             code = self._extension.exception_to_http_code(exception_type)
@@ -329,6 +385,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             yield ErrorResponse, code, ResponseData(item.description)
 
     def _get_request_body_parameter(self) -> Union[Tuple[str, Type], Tuple[None, None]]:
+        """
+        Get the name and type of the parameter used to pass the request body to the view handler.
+        """
         accepts_decorator = None
 
         for decorator in self._find_decorators(AcceptsDecorator):
@@ -366,6 +425,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         return body_param.name, resolve_fw_decl(self._wrapped_function, body_param.annotation)
 
     def _get_request_body_file_type(self) -> Optional[str]:
+        """
+        If the endpoint accepts files, get the supported types.
+        """
         result = None
         for decorator in self._find_decorators(AcceptsFileDecorator):
             if result is not None:
@@ -376,6 +438,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         return result
 
     def _get_query_string_parameters(self) -> Generator[Tuple[str, Type], None, None]:
+        """
+        Get names and types of parameters accepted by the endpoint via query string.
+        """
         for decorator in self._find_decorators(AcceptsQueryStringDecorator):
             for param in decorator.parameter_names:
                 if param not in self._signature.parameters:
@@ -395,6 +460,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         """
 
     def _get_security_requirements(self) -> Generator[Tuple[str, Sequence[str]], None, None]:
+        """
+        Get a security requirement specification from the endpoint.
+        """
         decorators = [*self._find_decorators(SecurityDecorator)]
 
         if len(decorators) > 1:
@@ -404,6 +472,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             yield scheme.name, decorators[0].scopes
 
     def _get_tags(self) -> Generator[str, None, None]:
+        """
+        Get endpoint tags (used in the specification to group similar endpoints).
+        """
         for decorator in self._find_decorators(TagsDecorator):
             for tag in decorator.tags:
                 if isinstance(tag, TagData):
@@ -411,6 +482,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
                 yield str(tag)
 
     def _is_param_ignored(self, param_name: str) -> bool:
+        """
+        Should a parameter be ignored when generating the specification?
+        """
         for decorator in self._find_decorators(IgnoreParamsDecorator):
             for ignored_param in decorator.ignored_params:
                 if ignored_param == param_name:

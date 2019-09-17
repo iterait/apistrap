@@ -33,6 +33,10 @@ class AioHTTPOperationWrapper(OperationWrapper):
         self._get_aiohttp_request_param_name()
 
     def _get_aiohttp_request_param_name(self) -> Optional[str]:
+        """
+        Find the parameter into which the AioHTTP request object should be injected.
+        """
+
         param: inspect.Parameter
         result = None
         for param in self._signature.parameters.values():
@@ -108,6 +112,10 @@ class AioHTTPOperationWrapper(OperationWrapper):
     async def _stream_file_response(
         self, request: BaseRequest, response: FileResponse, code: int, mimetype: str = None
     ):
+        """
+        Stream a file response to the client
+        """
+        
         # TODO consider implementing add_etags, cache_timeout and conditional
         headers = {}
 
