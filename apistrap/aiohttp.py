@@ -115,7 +115,7 @@ class AioHTTPOperationWrapper(OperationWrapper):
         """
         Stream a file response to the client
         """
-        
+
         # TODO consider implementing add_etags, cache_timeout and conditional
         headers = {}
 
