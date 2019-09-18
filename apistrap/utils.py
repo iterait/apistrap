@@ -52,6 +52,10 @@ def get_function_perspective_globals(function: Callable) -> Dict[str, Any]:
         if frame.filename == inspect.getsourcefile(function):
             globs.update(frame.frame.f_globals)
 
+    module = inspect.getmodule(function)
+    if module:
+        globs.update(inspect.getmembers(module))
+
     return globs
 
 
