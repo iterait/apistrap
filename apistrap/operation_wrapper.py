@@ -474,7 +474,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             return  # No security requirements
 
         for scheme in self._extension.security_schemes:
-            yield scheme.name, decorators[0].scopes
+            yield scheme.name, [*map(str, decorators[0].scopes)]
 
     def _get_tags(self) -> Generator[str, None, None]:
         """
