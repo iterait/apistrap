@@ -470,6 +470,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         if len(decorators) > 1:
             raise TypeError("Only one security decorator per view is allowed")
 
+        if len(decorators) == 0:
+            return  # No security requirements
+
         for scheme in self._extension.security_schemes:
             yield scheme.name, decorators[0].scopes
 
