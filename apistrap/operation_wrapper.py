@@ -88,8 +88,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         self._query_parameters = dict(self._get_query_string_parameters())
         self._path_parameters = dict(self._get_path_parameters())
 
-        self._security = dict(self._get_security_requirements())
-
+        self._security = [*self._get_security_requirements()]
         self._tags = [*self._get_tags()]
 
     ##############
@@ -474,7 +473,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             return  # No security requirements
 
         for scheme in self._extension.security_schemes:
-            yield scheme.name, [*map(str, decorators[0].scopes)]
+            yield {scheme.name: [*map(str, decorators[0].scopes)]}
 
     def _get_tags(self) -> Generator[str, None, None]:
         """

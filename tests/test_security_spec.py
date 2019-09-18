@@ -41,7 +41,7 @@ def test_security_spec(app_with_oauth, client):
         },
     }
 
-    assert response.json["paths"]["/secured"]["get"]["security"] == {"oauth": ["read"]}
+    assert response.json["paths"]["/secured"]["get"]["security"] == [{"oauth": ["read"]}]
 
 
 class Scope:
@@ -93,4 +93,4 @@ def test_security_spec_non_string_scopes(app_with_oauth_non_string_scopes, clien
         },
     }
 
-    assert response.json["paths"]["/secured"]["get"]["security"] == {"oauth": ["read"]}
+    assert response.json["paths"]["/secured"]["get"]["security"] == [{"oauth": ["read"]}]
