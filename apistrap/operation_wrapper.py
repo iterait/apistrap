@@ -460,7 +460,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         Get a list of path parameters accepted by the wrapped endpoint.
         """
 
-    def _get_security_requirements(self) -> Generator[Tuple[str, Sequence[str]], None, None]:
+    def _get_security_requirements(self) -> Generator[Dict[str, Sequence[str]], None, None]:
         """
         Get a security requirement specification from the endpoint.
         """
