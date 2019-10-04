@@ -4,17 +4,19 @@ import logging
 import re
 from functools import wraps
 from os import path
-from typing import Callable, Generator, List, Optional, Sequence, Tuple, Type
+from typing import Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type
 
 from flask import Blueprint, Flask, Response, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
 
 from apistrap.errors import ApiClientError, ApiServerError
-from apistrap.extension import Apistrap, ErrorHandler
+from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
 from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
 from apistrap.utils import format_exception, resolve_fw_decl
+
+SecurityEnforcer = Callable[[Sequence[str]], None]
 
 
 class FlaskOperationWrapper(OperationWrapper):
@@ -27,10 +29,24 @@ class FlaskOperationWrapper(OperationWrapper):
         self.method = method
         super().__init__(extension, function, decorators)
 
+    def _enforce_security(self):
+        error = None
+
+        for security_scheme, required_scopes in self._get_required_scopes():
+            try:
+                # If any enforcer passes without throwing, the user is authenticated
+                self._extension.security_enforcers[security_scheme](required_scopes)
+                return
+            except Exception as e:
+                error = e
+        else:
+            if error is not None:
+                raise error
+
     def get_decorated_function(self):
         @wraps(self._wrapped_function)
         def wrapper(*args, **kwargs):
-            self._check_security()
+            self._enforce_security()
 
             if self.accepts_body:
                 self._check_request_content_type(request.content_type)
@@ -100,6 +116,7 @@ class FlaskApistrap(Apistrap):
         self._app: Flask = None
         self._specs_extracted = False
         self._operations: Optional[List[FlaskOperationWrapper]] = None
+        self.security_enforcers: Dict[SecurityScheme, SecurityEnforcer] = {}
 
         self._default_error_handlers = (
             ErrorHandler(HTTPException, lambda exc_type: exc_type.code, self.http_error_handler),
@@ -133,6 +150,18 @@ class FlaskApistrap(Apistrap):
             app.register_error_handler(Exception, self._error_handler)
 
         app.before_first_request_funcs.append(self._decorate_view_handlers)
+
+    def add_security_scheme(self, scheme: SecurityScheme, enforcer: SecurityEnforcer):
+        """
+        Add a security scheme to be used by the API.
+
+        :param scheme: a description of the security scheme
+        :param enforcer: a function that checks the requirements of the security scheme
+        """
+
+        self.security_schemes.append(scheme)
+        self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
+        self.security_enforcers[scheme] = enforcer
 
     def _error_handler(self, exception: Exception):
         response = self.exception_to_response(exception)

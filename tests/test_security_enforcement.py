@@ -1,4 +1,4 @@
-from typing import List
+from typing import Sequence
 
 import pytest
 from flask import jsonify
@@ -8,7 +8,7 @@ from apistrap.flask import FlaskApistrap
 from apistrap.schemas import ErrorResponse
 
 
-def enforcer(scopes: List[str]):
+def enforcer(scopes: Sequence[str]):
     user_scopes = ["read", "write"]
 
     if not all((scope in user_scopes) for scope in scopes):
@@ -25,14 +25,14 @@ def app_with_oauth(app):
     oapi.add_security_scheme(
         OAuthSecurity(
             "oauth",
-            enforcer,
             OAuthFlowDefinition(
                 "authorization_code",
                 {"read": "Read stuff", "write": "Write stuff", "frobnicate": "Frobnicate stuff"},
                 "/auth",
                 "/token",
             ),
-        )
+        ),
+        enforcer
     )
 
     oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())
@@ -62,14 +62,14 @@ def app_with_oauth_and_unsecured_endpoint(app):
     oapi.add_security_scheme(
         OAuthSecurity(
             "oauth",
-            enforcer,
             OAuthFlowDefinition(
                 "authorization_code",
                 {"read": "Read stuff", "write": "Write stuff", "frobnicate": "Frobnicate stuff"},
                 "/auth",
                 "/token",
             ),
-        )
+        ),
+        enforcer
     )
 
     oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())
