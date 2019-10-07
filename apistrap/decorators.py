@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Optional, Sequence, Type, Union
 
 from schematics import Model
 
 from apistrap.tags import TagData
+
+if TYPE_CHECKING:
+    from apistrap.extension import SecurityScheme
 
 
 class IgnoreDecorator:
@@ -77,3 +82,4 @@ class SecurityDecorator:
     """
 
     scopes: Sequence[str]
+    security_scheme: Optional[SecurityScheme] = None

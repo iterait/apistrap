@@ -10,11 +10,11 @@ def app_with_oauth(app):
     oapi.add_security_scheme(
         OAuthSecurity(
             "oauth",
-            lambda scopes: None,
             OAuthFlowDefinition(
                 "authorization_code", {"read": "Read stuff", "write": "Write stuff"}, "/auth", "/token"
             ),
-        )
+        ),
+        lambda scopes: None
     )
 
     @app.route("/secured", methods=["GET"])
@@ -61,11 +61,11 @@ def app_with_oauth_non_string_scopes(app):
     oapi.add_security_scheme(
         OAuthSecurity(
             "oauth",
-            lambda scopes: None,
             OAuthFlowDefinition(
                 "authorization_code", {"read": "Read stuff", "write": "Write stuff"}, "/auth", "/token"
             ),
-        )
+        ),
+        lambda scopes: None
     )
 
     @app.route("/secured", methods=["GET"])

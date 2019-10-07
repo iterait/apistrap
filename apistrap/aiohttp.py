@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 import json
 import logging
@@ -6,7 +8,7 @@ import re
 from functools import wraps
 from os import path
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Generator, List, Optional, Sequence, Tuple, Type
+from typing import Any, Callable, Coroutine, Dict, Generator, List, Optional, Sequence, Tuple, Type
 
 import jinja2
 from aiohttp import StreamReader, web
@@ -16,17 +18,22 @@ from aiohttp.web_response import Response
 from aiohttp.web_urldispatcher import AbstractRoute, DynamicResource, PlainResource
 
 from apistrap.errors import ApiClientError
-from apistrap.extension import Apistrap, ErrorHandler
+from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
 from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
 from apistrap.utils import format_exception, resolve_fw_decl
 
+SecurityEnforcer = Callable[[BaseRequest, Sequence[str]], None]
+
 
 class AioHTTPOperationWrapper(OperationWrapper):
-    def __init__(self, extension: Apistrap, function: Callable, decorators: Sequence[object], route: AbstractRoute):
+    def __init__(
+        self, extension: AioHTTPApistrap, function: Callable, decorators: Sequence[object], route: AbstractRoute
+    ):
         self.route = route
         super().__init__(extension, function, decorators)
+        self._extension = extension
 
     def process_metadata(self):
         super().process_metadata()
@@ -58,10 +65,24 @@ class AioHTTPOperationWrapper(OperationWrapper):
 
         return None
 
+    def _enforce_security(self, request):
+        error = None
+
+        for security_scheme, required_scopes in self._get_required_scopes():
+            try:
+                # If any enforcer passes without throwing, the user is authenticated
+                self._extension.security_enforcers[security_scheme](request, required_scopes)
+                return
+            except Exception as e:
+                error = e
+        else:
+            if error is not None:
+                raise error
+
     def get_decorated_function(self):
         @wraps(self._wrapped_function)
         async def wrapper(request: Request):
-            self._check_security()
+            self._enforce_security(request)
 
             kwargs = {}
 
@@ -235,6 +256,7 @@ class AioHTTPApistrap(Apistrap):
         super().__init__()
         self.app: web.Application = None
         self.error_middleware = ErrorHandlerMiddleware(self)
+        self.security_enforcers: Dict[SecurityScheme, SecurityEnforcer] = {}
         self._jinja_env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(path.join(path.dirname(__file__), "templates"))
         )
@@ -265,6 +287,18 @@ class AioHTTPApistrap(Apistrap):
             if self.redoc_url is not None:
                 for redoc_url in (self.redoc_url, self.redoc_url + "/"):
                     app.router.add_route("get", redoc_url, self._get_redoc)
+
+    def add_security_scheme(self, scheme: SecurityScheme, enforcer: SecurityEnforcer):
+        """
+        Add a security scheme to be used by the API.
+
+        :param scheme: a description of the security scheme
+        :param enforcer: a function that checks the requirements of the security scheme
+        """
+
+        self.security_schemes.append(scheme)
+        self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
+        self.security_enforcers[scheme] = enforcer
 
     def _handle_server_error(self, exception):
         """
