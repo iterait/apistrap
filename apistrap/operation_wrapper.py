@@ -30,7 +30,7 @@ from apistrap.types import FileResponse
 from apistrap.utils import resolve_fw_decl, snake_to_camel
 
 if TYPE_CHECKING:  # pragma: no cover
-    from apistrap.extension import Apistrap
+    from apistrap.extension import Apistrap, SecurityEnforcer, SecurityScheme
 
 
 @dataclass(frozen=True)
@@ -249,18 +249,21 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
         return {self._request_body_parameter: body}
 
-    def _check_security(self):
+    def _get_required_scopes(self) -> Generator[Tuple[SecurityScheme, Sequence[str]]]:
         """
-        Ensure security policies are met.
+        Get a list of scopes required by the endpoint.
         """
+        for security_decorator in self._find_decorators(SecurityDecorator):
+            if len(self._extension.security_schemes) > 1 and security_decorator.security_scheme is None:
+                raise TypeError(
+                    "Multiple security schemes are defined - cannot use security decorator without an explicit scheme"
+                )
 
-        security_decorator = next(self._find_decorators(SecurityDecorator), None)
+            if len(self._extension.security_schemes) == 0:
+                raise TypeError("At least one security scheme must be defined in order to use the security decorator")
 
-        if security_decorator is None:
-            return
-
-        for scheme in self._extension.security_schemes:
-            scheme.enforcer(security_decorator.scopes)
+            scheme = security_decorator.security_scheme or self._extension.security_schemes[0]
+            yield scheme, security_decorator.scopes
 
     def _postprocess_response(self, response: Union[Model, Tuple[Model, int]]) -> Tuple[Model, int, Optional[str]]:
         """
@@ -465,9 +468,6 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         Get a security requirement specification from the endpoint.
         """
         decorators = [*self._find_decorators(SecurityDecorator)]
-
-        if len(decorators) > 1:
-            raise TypeError("Only one security decorator per view is allowed")
 
         if len(decorators) == 0:
             return  # No security requirements

@@ -29,13 +29,13 @@ class SecurityScheme(metaclass=ABCMeta):
     Description of an authentication method.
     """
 
-    def __init__(self, name: str, enforcer: Callable[[List[str]], None]):
+    def __init__(self, name: str):
         """
         :param name: Name of the scheme (used as the name in the OpenAPI specification)
-        :param enforcer: A function that takes a list of scopes and raises an error if the user doesn't have them
+        :param enforcer: An object invoked by an extension that takes a list of scopes and raises an error if the user
+                         doesn't have them
         """
         self.name = name
-        self.enforcer = enforcer
 
     @abc.abstractmethod
     def to_openapi_dict(self):
@@ -83,11 +83,11 @@ class OAuthSecurity(SecurityScheme):
     A description of an OAuth security scheme with an arbitrary list of OAuth 2 flows
     """
 
-    def __init__(self, name: str, enforcer: Callable, *flows: OAuthFlowDefinition):
+    def __init__(self, name: str, *flows: OAuthFlowDefinition):
         """
         :param flows: A list of OAuth 2 flows allowed by the security scheme
         """
-        super().__init__(name, enforcer)
+        super().__init__(name)
         self.flows = flows
 
     def to_openapi_dict(self):
@@ -361,16 +361,6 @@ class Apistrap(metaclass=ABCMeta):
             self.spec.components.schema(name, schema)
 
         return f"#/components/schemas/{name}"
-
-    def add_security_scheme(self, scheme: SecurityScheme):
-        """
-        Add a security scheme to be used by the API.
-
-        :param scheme: a description of the security scheme
-        """
-
-        self.security_schemes.append(scheme)
-        self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
 
     def add_tag_data(self, tag: TagData) -> None:
         """
