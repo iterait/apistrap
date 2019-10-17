@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 import logging
@@ -316,7 +317,7 @@ class AioHTTPApistrap(Apistrap):
         :return: an ErrorResponse instance
         """
         logging.exception(exception)
-        if self.app.debug:
+        if asyncio.get_running_loop().get_debug():
             return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
         else:
             return ErrorResponse(dict(message="Internal server error"))
@@ -328,7 +329,7 @@ class AioHTTPApistrap(Apistrap):
         :param exception: the exception to be handled
         :return: an ErrorResponse instance
         """
-        if self.app.debug:
+        if asyncio.get_running_loop().get_debug():
             logging.exception(exception)
             return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
         else:
@@ -347,7 +348,7 @@ class AioHTTPApistrap(Apistrap):
         logging.exception(exception)
         return ErrorResponse(dict(message=exception.text))
 
-    def _get_spec(self, request: Request):
+    async def _get_spec(self, request: Request):
         """
         Serves the OpenAPI specification
         """
@@ -356,7 +357,7 @@ class AioHTTPApistrap(Apistrap):
 
     _get_spec.apistrap_ignore = True
 
-    def _get_ui(self, request: Request):
+    async def _get_ui(self, request: Request):
         """
         Serves Swagger UI
         """
@@ -369,7 +370,7 @@ class AioHTTPApistrap(Apistrap):
 
     _get_ui.apistrap_ignore = True
 
-    def _get_redoc(self, request: Request):
+    async def _get_redoc(self, request: Request):
         """
         Serves ReDoc
         """

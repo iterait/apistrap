@@ -9,23 +9,24 @@ def error_routes():
     routes = web.RouteTableDef()
 
     @routes.get('/client_error')
-    def view_1(request):
+    async def view_1(request):
         raise ApiClientError()
 
     @routes.get('/server_error')
-    def view_2(request):
+    async def view_2(request):
         raise ApiServerError()
 
     @routes.get('/internal_error')
-    def view_3(request):
+    async def view_3(request):
         raise RuntimeError('Runtime error occurred')
 
     yield routes
 
 
 @pytest.fixture()
-def app_with_errors(aiohttp_apistrap, error_routes):
-    app = web.Application(debug=True)
+def app_with_errors(aiohttp_apistrap, error_routes, loop):
+    loop.set_debug(True)
+    app = web.Application()
     app.add_routes(error_routes)
     aiohttp_apistrap.init_app(app)
     yield app
@@ -33,7 +34,7 @@ def app_with_errors(aiohttp_apistrap, error_routes):
 
 @pytest.fixture()
 def app_with_errors_in_production(aiohttp_apistrap, error_routes):
-    app = web.Application(debug=False)
+    app = web.Application()
     app.add_routes(error_routes)
     aiohttp_apistrap.init_app(app)
     yield app
