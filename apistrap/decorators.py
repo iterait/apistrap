@@ -46,6 +46,7 @@ class AcceptsDecorator:
     """
 
     request_class: Type[Model]
+    mimetypes: Sequence[str] = ("application/json",)
 
 
 @dataclass(frozen=True)

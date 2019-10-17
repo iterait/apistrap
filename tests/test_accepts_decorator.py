@@ -136,3 +136,41 @@ def test_no_injection_parameter(app, flask_apistrap, client):
 def test_invalid_json(app_with_accepts, flask_apistrap, client):
     response = client.post("/", json="asdfasdf")
     assert response.status_code == 400
+
+
+@pytest.fixture()
+def app_with_accepts_form(app, flask_apistrap):
+    @app.route("/", methods=["POST"])
+    @flask_apistrap.accepts(Request, mimetypes=["application/x-www-form-urlencoded"])
+    def view(req: Request):
+        assert req.string_field == "foo"
+        assert req.int_field == 42
+        return jsonify()
+
+
+def test_form_parameter_in_spec_json(app_with_accepts_form, client):
+    response = client.get("/spec.json")
+
+    assert "components" in response.json
+    assert "schemas" in response.json["components"]
+
+    path = response.json["paths"]["/"]["post"]
+
+    body = path["requestBody"]
+    assert body is not None
+    assert body["required"] is True
+
+    ref = extract_definition_name(body["content"]["application/x-www-form-urlencoded"]["schema"]["$ref"])
+    assert response.json["components"]["schemas"][ref] == {
+        "title": Request.__name__,
+        "type": "object",
+        "properties": {
+            "int_field": {
+                "type": "integer"
+            },
+            "string_field": {
+                "type": "string"
+            }
+        },
+        "required": ["string_field", "int_field"]
+    }
