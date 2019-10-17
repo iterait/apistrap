@@ -8,7 +8,7 @@ import re
 from functools import wraps
 from os import path
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Dict, Generator, List, Optional, Sequence, Tuple, Type
+from typing import Any, Awaitable, Callable, Coroutine, Dict, Generator, List, Optional, Sequence, Tuple, Type, Union
 
 import jinja2
 from aiohttp import StreamReader, web
@@ -24,7 +24,7 @@ from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
 from apistrap.utils import format_exception, resolve_fw_decl
 
-SecurityEnforcer = Callable[[BaseRequest, Sequence[str]], None]
+SecurityEnforcer = Callable[[BaseRequest, Sequence[str]], Union[None, Awaitable[None]]]
 
 
 class AioHTTPOperationWrapper(OperationWrapper):
@@ -65,13 +65,18 @@ class AioHTTPOperationWrapper(OperationWrapper):
 
         return None
 
-    def _enforce_security(self, request):
+    async def _enforce_security(self, request):
         error = None
 
         for security_scheme, required_scopes in self._get_required_scopes():
             try:
                 # If any enforcer passes without throwing, the user is authenticated
-                self._extension.security_enforcers[security_scheme](request, required_scopes)
+                enforcer = self._extension.security_enforcers[security_scheme]
+
+                if inspect.iscoroutinefunction(enforcer):
+                    await enforcer(request, required_scopes)
+                else:
+                    enforcer(request, required_scopes)
                 return
             except Exception as e:
                 error = e
@@ -82,7 +87,7 @@ class AioHTTPOperationWrapper(OperationWrapper):
     def get_decorated_function(self):
         @wraps(self._wrapped_function)
         async def wrapper(request: Request):
-            self._enforce_security(request)
+            await self._enforce_security(request)
 
             kwargs = {}
 
