@@ -254,15 +254,23 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         Get a list of scopes required by the endpoint.
         """
         for security_decorator in self._find_decorators(SecurityDecorator):
-            if len(self._extension.security_schemes) > 1 and security_decorator.security_scheme is None:
+            if (
+                len(self._extension.security_schemes) > 1
+                and self._extension.default_security_scheme is None
+                and security_decorator.security_scheme is None
+            ):
                 raise TypeError(
-                    "Multiple security schemes are defined - cannot use security decorator without an explicit scheme"
+                    "Multiple security schemes are defined and no default is set - cannot use security decorator without an explicit scheme"
                 )
 
             if len(self._extension.security_schemes) == 0:
                 raise TypeError("At least one security scheme must be defined in order to use the security decorator")
 
-            scheme = security_decorator.security_scheme or self._extension.security_schemes[0]
+            scheme = (
+                security_decorator.security_scheme
+                or self._extension.default_security_scheme
+                or self._extension.security_schemes[0]
+            )
             yield scheme, security_decorator.scopes
 
     def _postprocess_response(self, response: Union[Model, Tuple[Model, int]]) -> Tuple[Model, int, Optional[str]]:

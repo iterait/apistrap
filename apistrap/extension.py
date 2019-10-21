@@ -123,6 +123,7 @@ class Apistrap(metaclass=ABCMeta):
         self.oauth_client_id = None
         self.oauth_client_secret = None
         self.security_schemes: List[SecurityScheme] = []
+        self.default_security_scheme: Optional[SecurityScheme] = None
         self._spec_url = "/spec.json"
         self._ui_url = "/apidocs"
         self._redoc_url = None
@@ -372,6 +373,15 @@ class Apistrap(metaclass=ABCMeta):
         if "tags" not in spec or tag.name not in map(lambda t: t["name"], spec["tags"]):
             self.spec.tag(tag.to_dict())
 
+    def _add_security_scheme(self, scheme: SecurityScheme, default: bool):
+        self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
+        self.security_schemes.append(scheme)
+        if default:
+            if self.default_security_scheme is not None:
+                raise ApistrapExtensionError("A default security scheme is already set")
+
+            self.default_security_scheme = scheme
+
     #######################
     # Decorator utilities #
     #######################
@@ -411,11 +421,11 @@ class Apistrap(metaclass=ABCMeta):
         """
         return partial(self._decorate, IgnoreParamsDecorator(ignored_params))
 
-    def security(self, *scopes: str):
+    def security(self, *scopes: str, scheme: SecurityScheme = None):
         """
         A decorator that enforces user authentication and authorization.
         """
-        return partial(self._decorate, SecurityDecorator(scopes))
+        return partial(self._decorate, SecurityDecorator(scopes, security_scheme=scheme))
 
     def responds_with(
         self,
