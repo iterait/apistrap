@@ -91,7 +91,7 @@ class FlaskOperationWrapper(OperationWrapper):
                 raise ApiClientError("The request body must be a JSON object") from ex
 
             return request.json
-        elif request.content_type in ("application/x-www-urlencoded", "multipart/form-data"):
+        elif request.content_type in ("application/x-www-form-urlencoded", "multipart/form-data"):
             return request.form
 
         raise UnsupportedMediaTypeError()

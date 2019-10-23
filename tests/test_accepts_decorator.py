@@ -174,3 +174,13 @@ def test_form_parameter_in_spec_json(app_with_accepts_form, client):
         },
         "required": ["string_field", "int_field"]
     }
+
+
+def test_accepting_form(app_with_accepts_form, client):
+    response = client.post("/", data={
+        "int_field": "42",
+        "string_field": "foo"
+    }, content_type="application/x-www-form-urlencoded")
+
+    assert response.status_code == 200
+    assert response.json == {}
