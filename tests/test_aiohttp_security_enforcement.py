@@ -10,22 +10,22 @@ from apistrap.extension import OAuthFlowDefinition, OAuthSecurity
 from apistrap.schemas import ErrorResponse
 
 
-def enforcer(request: BaseRequest, scopes: Sequence[str]):
+def rw_allowing_enforcer(request: BaseRequest, scopes: Sequence[str]):
     user_scopes = ["read", "write"]
 
     if not all((scope in user_scopes) for scope in scopes):
         raise ForbiddenRequestError()
 
 
-async def async_enforcer(request: BaseRequest, scopes: Sequence[str]):
-    enforcer(request, scopes)
+async def async_rw_allowing_enforcer(request: BaseRequest, scopes: Sequence[str]):
+    rw_allowing_enforcer(request, scopes)
 
 
 class ForbiddenRequestError(Exception):
     pass
 
 
-@pytest.fixture(params=[enforcer, async_enforcer])
+@pytest.fixture(params=[rw_allowing_enforcer, async_rw_allowing_enforcer])
 async def app_with_oauth(request):
     app = web.Application()
     routes = web.RouteTableDef()
@@ -66,7 +66,7 @@ async def app_with_oauth(request):
     yield app
 
 
-@pytest.fixture(params=[enforcer, async_enforcer])
+@pytest.fixture(params=[rw_allowing_enforcer, async_rw_allowing_enforcer])
 async def app_with_oauth_and_unsecured_endpoint(request):
     app = web.Application()
     routes = web.RouteTableDef()
