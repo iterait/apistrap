@@ -385,7 +385,8 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
     def _get_request_body_parameter(self) -> Union[Tuple[str, Type, Optional[Sequence[str]]], Tuple[None, None, None]]:
         """
-        Get the name and type of the parameter used to pass the request body to the view handler.
+        Get the name and type of the parameter used to pass the request body to the view handler and a list of content
+        types supported by the handler.
         """
         accepts_decorator = None
 
