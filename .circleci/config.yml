@@ -7,9 +7,8 @@ references:
       name: Install dependencies and apistrap on Archlinux
       command: |
         set -x
-        pacman -S --noconfirm python-pip
-        pip install coveralls coverage
-        pip install -e .
+        pip install --user coveralls coverage
+        pip install --user .
 
   test: &test
     run:
@@ -21,7 +20,7 @@ references:
     run:
       name: PyPI deploy
       command: |
-        pip3 install wheel setuptools --upgrade
+        pip install wheel setuptools --upgrade --user
         bash <(curl -fsSL https://raw.githubusercontent.com/iterait/ci-utils/master/pypi_deploy.sh)
 
   coverage: &coverage
@@ -32,23 +31,29 @@ references:
         coverage report
         COVERALLS_REPO_TOKEN=QEAuo5Pufwd8TGqQiqt7a1HWWp3i9mL0Y coveralls
 
-jobs:
-
-  test_archlinux:
-    docker:
-      - image: iterait/archlinux
+  test_job: &test_job
     working_directory: ~/apistrap
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-          version: 17.11.0-ce
       - checkout
       - *install
       - *test
 
+
+jobs:
+
+  test_py_37:
+    <<: *test_job
+    docker:
+      - image: circleci/python:3.7
+
+  test_py_38:
+    <<: *test_job
+    docker:
+      - image: circleci/python:3.8
+
   coverage:
     docker:
-      - image: iterait/archlinux
+      - image: circleci/python:3.8
     working_directory: ~/apistrap
     steps:
       - checkout
@@ -57,7 +62,7 @@ jobs:
 
   deploy:
      docker:
-       - image: iterait/archlinux
+       - image: iterait/archlinux-dev
      working_directory: ~/apistrap
      steps:
        - checkout
@@ -68,16 +73,19 @@ workflows:
   version: 2
   test-doc-deploy:
     jobs:
-      - test_archlinux
+      - test_py_37
+      - test_py_38
       - coverage:
           requires:
-            - test_archlinux
+            - test_py_37
+            - test_py_38
       - deploy:
           filters:
             branches:
               only: master
           requires:
-            - test_archlinux
+            - test_py_37
+            - test_py_38
             - coverage
 
   nightly-build:
@@ -90,4 +98,5 @@ workflows:
                 - master
                 - dev
     jobs:
-      - test_archlinux
+      - test_py_37
+      - test_py_38
