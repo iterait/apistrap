@@ -84,6 +84,10 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         self._request_body_parameter, self._request_body_class, self._request_body_content_types = (
             self._get_request_body_parameter()
         )
+
+        if self._request_body_content_types is None:
+            self._request_body_content_types = ["application/json"]
+
         self._request_body_file_type = self._get_request_body_file_type()
         if self._request_body_parameter is not None and self._request_body_file_type is not None:
             raise TypeError("An endpoint cannot accept both a file and a model")
@@ -150,7 +154,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             spec["parameters"].append(param_spec)
 
         if self._request_body_parameter:
-            mimetypes = self._request_body_content_types or "application/json"
+            mimetypes = self._request_body_content_types
 
             spec["requestBody"] = {
                 "content": {
@@ -425,7 +429,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         return (
             body_param.name,
             resolve_fw_decl(self._wrapped_function, body_param.annotation),
-            accepts_decorator.mimetypes if accepts_decorator else ("application/json",),
+            accepts_decorator.mimetypes if accepts_decorator else None,
         )
 
     def _get_request_body_file_type(self) -> Optional[str]:
