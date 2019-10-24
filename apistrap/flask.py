@@ -9,7 +9,7 @@ from typing import Callable, Dict, Generator, List, Optional, Sequence, Tuple, T
 from flask import Blueprint, Flask, Response, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
 
-from apistrap.errors import ApiClientError, ApiServerError
+from apistrap.errors import ApiClientError, ApiServerError, UnsupportedMediaTypeError
 from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
 from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
@@ -49,15 +49,8 @@ class FlaskOperationWrapper(OperationWrapper):
             self._enforce_security()
 
             if self.accepts_body:
-                self._check_request_content_type(request.content_type)
-
-                try:
-                    if request.json is None or isinstance(request.json, str):
-                        raise ApiClientError("The request body must be a JSON object")
-                except json.decoder.JSONDecodeError as ex:
-                    raise ApiClientError("The request body must be a JSON object") from ex
-
-                kwargs.update(self._load_request_body(request.json))
+                data = self._load_request_body_primitive()
+                kwargs.update(self._load_request_body(data))
 
             # path parameters are already handled by Flask (and they should be in args/kwargs)
 
@@ -88,6 +81,20 @@ class FlaskOperationWrapper(OperationWrapper):
             return response
 
         return wrapper
+
+    def _load_request_body_primitive(self) -> dict:
+        if request.content_type == "application/json":
+            try:
+                if request.json is None or isinstance(request.json, str):
+                    raise ApiClientError("The request body must be a JSON object")
+            except json.decoder.JSONDecodeError as ex:
+                raise ApiClientError("The request body must be a JSON object") from ex
+
+            return request.json
+        elif request.content_type in ("application/x-www-form-urlencoded", "multipart/form-data"):
+            return request.form
+
+        raise UnsupportedMediaTypeError()
 
     def _get_path_parameters(self) -> Generator[Tuple[str, Type], None, None]:
         for param in re.findall("(<([^<>]*:)?([^<>]*)>)", self.url_rule):
@@ -120,6 +127,7 @@ class FlaskApistrap(Apistrap):
 
         self._default_error_handlers = (
             ErrorHandler(HTTPException, lambda exc_type: exc_type.code, self.http_error_handler),
+            ErrorHandler(UnsupportedMediaTypeError, 415, self.error_handler),
             ErrorHandler(ApiClientError, 400, self.error_handler),
             ErrorHandler(ApiServerError, 500, self.internal_error_handler),
             ErrorHandler(Exception, 500, self.internal_error_handler),

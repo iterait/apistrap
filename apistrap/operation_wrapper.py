@@ -21,7 +21,7 @@ from apistrap.decorators import (
     SecurityDecorator,
     TagsDecorator,
 )
-from apistrap.errors import ApiClientError, InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
+from apistrap.errors import InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
 from apistrap.examples import ExamplesMixin, model_examples_to_openapi_dict
 from apistrap.schemas import ErrorResponse
 from apistrap.schematics_converters import schematics_model_to_schema_object
@@ -30,7 +30,7 @@ from apistrap.types import FileResponse
 from apistrap.utils import resolve_fw_decl, snake_to_camel
 
 if TYPE_CHECKING:  # pragma: no cover
-    from apistrap.extension import Apistrap, SecurityEnforcer, SecurityScheme
+    from apistrap.extension import Apistrap, SecurityScheme
 
 
 @dataclass(frozen=True)
@@ -60,6 +60,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         self._request_body_class: Optional[Type[Model]] = None
         self._request_body_parameter: Optional[str] = None
         self._request_body_file_type: Optional[str] = None
+        self._request_body_content_types: Optional[Sequence[str]] = None
         self._path_parameters: Dict[str, Type] = {}
         self._query_parameters: Dict[str, Type] = {}
         self._security: Dict[str, Sequence[str]] = {}
@@ -80,7 +81,13 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
         self._responses = self._get_responses()
 
-        self._request_body_parameter, self._request_body_class = self._get_request_body_parameter()
+        self._request_body_parameter, self._request_body_class, self._request_body_content_types = (
+            self._get_request_body_parameter()
+        )
+
+        if self._request_body_content_types is None:
+            self._request_body_content_types = ["application/json"]
+
         self._request_body_file_type = self._get_request_body_file_type()
         if self._request_body_parameter is not None and self._request_body_file_type is not None:
             raise TypeError("An endpoint cannot accept both a file and a model")
@@ -147,19 +154,21 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             spec["parameters"].append(param_spec)
 
         if self._request_body_parameter:
+            mimetypes = self._request_body_content_types
+
             spec["requestBody"] = {
                 "content": {
-                    "application/json": {
-                        "schema": schematics_model_to_schema_object(self._request_body_class, self._extension)
-                    }
+                    mimetype: {"schema": schematics_model_to_schema_object(self._request_body_class, self._extension)}
+                    for mimetype in mimetypes
                 },
                 "required": True,
             }
 
             if issubclass(self._request_body_class, ExamplesMixin):
-                spec["requestBody"]["content"]["application/json"]["examples"] = model_examples_to_openapi_dict(
-                    self._request_body_class
-                )
+                for mimetype in mimetypes:
+                    spec["requestBody"]["content"][mimetype]["examples"] = model_examples_to_openapi_dict(
+                        self._request_body_class
+                    )
 
             param_doc = self._get_param_doc(self._request_body_parameter)
             if param_doc is not None and param_doc.description:
@@ -320,16 +329,6 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
         return None
 
-    def _check_request_content_type(self, content_type: str):
-        """
-        Make sure that received content type is supported by the underlying view handler.
-
-        :param content_type: name of the received content type (e.g. 'text/plain')
-        """
-
-        if content_type != "application/json":
-            raise ApiClientError("Unsupported media type, JSON is expected")
-
     ###################################
     # Extraction of endpoint metadata #
     ###################################
@@ -396,9 +395,10 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
             yield ErrorResponse, code, ResponseData(item.description)
 
-    def _get_request_body_parameter(self) -> Union[Tuple[str, Type], Tuple[None, None]]:
+    def _get_request_body_parameter(self) -> Union[Tuple[str, Type, Optional[Sequence[str]]], Tuple[None, None, None]]:
         """
-        Get the name and type of the parameter used to pass the request body to the view handler.
+        Get the name and type of the parameter used to pass the request body to the view handler and a list of content
+        types supported by the handler.
         """
         accepts_decorator = None
 
@@ -432,9 +432,13 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             if accepts_decorator:
                 raise TypeError("No parameter for request body injection")
 
-            return None, None
+            return None, None, None
 
-        return body_param.name, resolve_fw_decl(self._wrapped_function, body_param.annotation)
+        return (
+            body_param.name,
+            resolve_fw_decl(self._wrapped_function, body_param.annotation),
+            accepts_decorator.mimetypes if accepts_decorator else None,
+        )
 
     def _get_request_body_file_type(self) -> Optional[str]:
         """
@@ -443,7 +447,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         result = None
         for decorator in self._find_decorators(AcceptsFileDecorator):
             if result is not None:
-                raise TypeError("An endpoint cannot accept multiple file types")
+                raise TypeError("An endpoint cannot accept files of multiple types")
 
             result = decorator.mime_type
 

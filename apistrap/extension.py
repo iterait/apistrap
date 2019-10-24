@@ -441,12 +441,14 @@ class Apistrap(metaclass=ABCMeta):
         """
         return partial(self._decorate, RespondsWithDecorator(response_class, code, description, mimetype))
 
-    def accepts(self, request_class: Type[Model]):
+    def accepts(self, request_class: Type[Model], mimetypes: Optional[Sequence[str]] = None):
         """
         A decorator that validates request bodies against a schema and passes it as an argument to the view function.
         The destination argument must be annotated with the request type.
         """
-        return partial(self._decorate, AcceptsDecorator(request_class))
+        return partial(
+            self._decorate, AcceptsDecorator(request_class, mimetypes) if mimetypes else AcceptsDecorator(request_class)
+        )
 
     def accepts_file(self, mime_type: str = "application/octet-stream"):
         """
