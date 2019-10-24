@@ -6,7 +6,7 @@ from schematics import Model
 from schematics.types import IntType, StringType
 from werkzeug.test import Client
 
-from apistrap.errors import ApiClientError, InvalidFieldsError
+from apistrap.errors import InvalidFieldsError
 
 
 def extract_definition_name(definition_spec: str):
@@ -65,12 +65,13 @@ def test_request_parsing(app_with_accepts, client: Client):
     assert response.status_code == 200
 
 
-def test_unsupported_content_type(app_with_accepts, client: Client, propagate_exceptions):
-    with pytest.raises(ApiClientError):
-        client.post("/", data=json.dumps({
-            "string_field": "foo",
-            "int_field": 42
-        }))
+def test_unsupported_content_type(app_with_accepts, client: Client):
+    response = client.post("/", data=json.dumps({
+        "string_field": "foo",
+        "int_field": 42
+    }), content_type="text/plain")
+
+    assert response.status_code == 415
 
 
 @pytest.mark.parametrize("field", ["string_field", "int_field"])
@@ -136,3 +137,51 @@ def test_no_injection_parameter(app, flask_apistrap, client):
 def test_invalid_json(app_with_accepts, flask_apistrap, client):
     response = client.post("/", json="asdfasdf")
     assert response.status_code == 400
+
+
+@pytest.fixture()
+def app_with_accepts_form(app, flask_apistrap):
+    @app.route("/", methods=["POST"])
+    @flask_apistrap.accepts(Request, mimetypes=["application/x-www-form-urlencoded"])
+    def view(req: Request):
+        assert req.string_field == "foo"
+        assert req.int_field == 42
+        return jsonify()
+
+
+def test_form_parameter_in_spec_json(app_with_accepts_form, client):
+    response = client.get("/spec.json")
+
+    assert "components" in response.json
+    assert "schemas" in response.json["components"]
+
+    path = response.json["paths"]["/"]["post"]
+
+    body = path["requestBody"]
+    assert body is not None
+    assert body["required"] is True
+
+    ref = extract_definition_name(body["content"]["application/x-www-form-urlencoded"]["schema"]["$ref"])
+    assert response.json["components"]["schemas"][ref] == {
+        "title": Request.__name__,
+        "type": "object",
+        "properties": {
+            "int_field": {
+                "type": "integer"
+            },
+            "string_field": {
+                "type": "string"
+            }
+        },
+        "required": ["string_field", "int_field"]
+    }
+
+
+def test_accepting_form(app_with_accepts_form, client):
+    response = client.post("/", data={
+        "int_field": "42",
+        "string_field": "foo"
+    }, content_type="application/x-www-form-urlencoded")
+
+    assert response.status_code == 200
+    assert response.json == {}

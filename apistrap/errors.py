@@ -13,6 +13,12 @@ class ApiClientError(Exception):
     """
 
 
+class UnsupportedMediaTypeError(ApiClientError):
+    """
+    An exception raised when the user of the API requests or supplies content of an unsupported type.
+    """
+
+
 class InvalidFieldsError(ApiClientError):
     """
     An exception raised when the user of the API sends a malformed request object

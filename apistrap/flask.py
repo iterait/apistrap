@@ -9,7 +9,7 @@ from typing import Callable, Dict, Generator, List, Optional, Sequence, Tuple, T
 from flask import Blueprint, Flask, Response, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
 
-from apistrap.errors import ApiClientError, ApiServerError
+from apistrap.errors import ApiClientError, ApiServerError, UnsupportedMediaTypeError
 from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
 from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
@@ -49,15 +49,8 @@ class FlaskOperationWrapper(OperationWrapper):
             self._enforce_security()
 
             if self.accepts_body:
-                self._check_request_content_type(request.content_type)
-
-                try:
-                    if request.json is None or isinstance(request.json, str):
-                        raise ApiClientError("The request body must be a JSON object")
-                except json.decoder.JSONDecodeError as ex:
-                    raise ApiClientError("The request body must be a JSON object") from ex
-
-                kwargs.update(self._load_request_body(request.json))
+                data = self._load_request_body_primitive()
+                kwargs.update(self._load_request_body(data))
 
             # path parameters are already handled by Flask (and they should be in args/kwargs)
 
@@ -88,6 +81,20 @@ class FlaskOperationWrapper(OperationWrapper):
             return response
 
         return wrapper
+
+    def _load_request_body_primitive(self) -> dict:
+        if request.content_type == "application/json":
+            try:
+                if request.json is None or isinstance(request.json, str):
+                    raise ApiClientError("The request body must be a JSON object")
+            except json.decoder.JSONDecodeError as ex:
+                raise ApiClientError("The request body must be a JSON object") from ex
+
+            return request.json
+        elif request.content_type in ("application/x-www-form-urlencoded", "multipart/form-data"):
+            return request.form
+
+        raise UnsupportedMediaTypeError()
 
     def _get_path_parameters(self) -> Generator[Tuple[str, Type], None, None]:
         for param in re.findall("(<([^<>]*:)?([^<>]*)>)", self.url_rule):
@@ -120,6 +127,7 @@ class FlaskApistrap(Apistrap):
 
         self._default_error_handlers = (
             ErrorHandler(HTTPException, lambda exc_type: exc_type.code, self.http_error_handler),
+            ErrorHandler(UnsupportedMediaTypeError, 415, self.error_handler),
             ErrorHandler(ApiClientError, 400, self.error_handler),
             ErrorHandler(ApiServerError, 500, self.internal_error_handler),
             ErrorHandler(Exception, 500, self.internal_error_handler),
@@ -151,16 +159,16 @@ class FlaskApistrap(Apistrap):
 
         app.before_first_request_funcs.append(self._decorate_view_handlers)
 
-    def add_security_scheme(self, scheme: SecurityScheme, enforcer: SecurityEnforcer):
+    def add_security_scheme(self, scheme: SecurityScheme, enforcer: SecurityEnforcer, *, default: bool = False):
         """
         Add a security scheme to be used by the API.
 
         :param scheme: a description of the security scheme
         :param enforcer: a function that checks the requirements of the security scheme
+        :param default: should this be used as the default security scheme?
         """
 
-        self.security_schemes.append(scheme)
-        self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
+        self._add_security_scheme(scheme, default)
         self.security_enforcers[scheme] = enforcer
 
     def _error_handler(self, exception: Exception):

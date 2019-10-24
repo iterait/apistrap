@@ -18,7 +18,7 @@ from schematics.types.compound import DictType, ListType, ModelType
 
 from apistrap.utils import snake_to_camel
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from apistrap.extension import Apistrap
 
 

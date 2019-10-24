@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 import logging
@@ -8,7 +9,7 @@ import re
 from functools import wraps
 from os import path
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Dict, Generator, List, Optional, Sequence, Tuple, Type
+from typing import Any, Awaitable, Callable, Coroutine, Dict, Generator, List, Optional, Sequence, Tuple, Type, Union
 
 import jinja2
 from aiohttp import StreamReader, web
@@ -17,14 +18,14 @@ from aiohttp.web_request import BaseRequest, Request
 from aiohttp.web_response import Response
 from aiohttp.web_urldispatcher import AbstractRoute, DynamicResource, PlainResource
 
-from apistrap.errors import ApiClientError
+from apistrap.errors import ApiClientError, UnsupportedMediaTypeError
 from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
 from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
 from apistrap.types import FileResponse
 from apistrap.utils import format_exception, resolve_fw_decl
 
-SecurityEnforcer = Callable[[BaseRequest, Sequence[str]], None]
+SecurityEnforcer = Callable[[BaseRequest, Sequence[str]], Union[None, Awaitable[None]]]
 
 
 class AioHTTPOperationWrapper(OperationWrapper):
@@ -65,13 +66,18 @@ class AioHTTPOperationWrapper(OperationWrapper):
 
         return None
 
-    def _enforce_security(self, request):
+    async def _enforce_security(self, request):
         error = None
 
         for security_scheme, required_scopes in self._get_required_scopes():
             try:
                 # If any enforcer passes without throwing, the user is authenticated
-                self._extension.security_enforcers[security_scheme](request, required_scopes)
+                enforcer = self._extension.security_enforcers[security_scheme]
+
+                if inspect.iscoroutinefunction(enforcer):
+                    await enforcer(request, required_scopes)
+                else:
+                    enforcer(request, required_scopes)
                 return
             except Exception as e:
                 error = e
@@ -82,21 +88,12 @@ class AioHTTPOperationWrapper(OperationWrapper):
     def get_decorated_function(self):
         @wraps(self._wrapped_function)
         async def wrapper(request: Request):
-            self._enforce_security(request)
+            await self._enforce_security(request)
 
             kwargs = {}
 
             if self.accepts_body:
-                self._check_request_content_type(request.content_type)
-
-                try:
-                    data = await request.json()
-                except json.decoder.JSONDecodeError as ex:
-                    raise ApiClientError("The request body must be a JSON object") from ex
-
-                if isinstance(data, str):
-                    raise ApiClientError("The request body must be a JSON object")
-
+                data = await self._load_request_body_primitive(request)
                 kwargs.update(self._load_request_body(data))
 
             for name, param_type in self._path_parameters.items():
@@ -129,6 +126,22 @@ class AioHTTPOperationWrapper(OperationWrapper):
             return web.Response(text=json.dumps(response.to_primitive()), content_type="application/json", status=code)
 
         return wrapper
+
+    async def _load_request_body_primitive(self, request: BaseRequest) -> dict:
+        if request.content_type == "application/json":
+            try:
+                data = await request.json()
+            except json.decoder.JSONDecodeError as ex:
+                raise ApiClientError("The request body must be a JSON object") from ex
+
+            if isinstance(data, str):
+                raise ApiClientError("The request body must be a JSON object")
+
+            return data
+        elif request.content_type in ("application/x-www-form-urlencoded", "multipart/form-data"):
+            return await request.post()
+
+        raise UnsupportedMediaTypeError()
 
     async def _stream_file_response(
         self, request: BaseRequest, response: FileResponse, code: int, mimetype: str = None
@@ -262,6 +275,7 @@ class AioHTTPApistrap(Apistrap):
         )
         self._default_error_handlers = [
             ErrorHandler(HTTPError, lambda exc_type: exc_type.status_code, self._handle_http_error),
+            ErrorHandler(UnsupportedMediaTypeError, 415, self._handle_client_error),
             ErrorHandler(ApiClientError, 400, self._handle_client_error),
             ErrorHandler(Exception, 500, self._handle_server_error),
         ]
@@ -288,16 +302,16 @@ class AioHTTPApistrap(Apistrap):
                 for redoc_url in (self.redoc_url, self.redoc_url + "/"):
                     app.router.add_route("get", redoc_url, self._get_redoc)
 
-    def add_security_scheme(self, scheme: SecurityScheme, enforcer: SecurityEnforcer):
+    def add_security_scheme(self, scheme: SecurityScheme, enforcer: SecurityEnforcer, *, default: bool = False):
         """
         Add a security scheme to be used by the API.
 
         :param scheme: a description of the security scheme
         :param enforcer: a function that checks the requirements of the security scheme
+        :param default: should this be used as the default security scheme?
         """
 
-        self.security_schemes.append(scheme)
-        self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
+        self._add_security_scheme(scheme, default)
         self.security_enforcers[scheme] = enforcer
 
     def _handle_server_error(self, exception):
@@ -308,7 +322,7 @@ class AioHTTPApistrap(Apistrap):
         :return: an ErrorResponse instance
         """
         logging.exception(exception)
-        if self.app.debug:
+        if asyncio.get_running_loop().get_debug():
             return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
         else:
             return ErrorResponse(dict(message="Internal server error"))
@@ -320,7 +334,7 @@ class AioHTTPApistrap(Apistrap):
         :param exception: the exception to be handled
         :return: an ErrorResponse instance
         """
-        if self.app.debug:
+        if asyncio.get_running_loop().get_debug():
             logging.exception(exception)
             return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
         else:
@@ -339,7 +353,7 @@ class AioHTTPApistrap(Apistrap):
         logging.exception(exception)
         return ErrorResponse(dict(message=exception.text))
 
-    def _get_spec(self, request: Request):
+    async def _get_spec(self, request: Request):
         """
         Serves the OpenAPI specification
         """
@@ -348,7 +362,7 @@ class AioHTTPApistrap(Apistrap):
 
     _get_spec.apistrap_ignore = True
 
-    def _get_ui(self, request: Request):
+    async def _get_ui(self, request: Request):
         """
         Serves Swagger UI
         """
@@ -361,7 +375,7 @@ class AioHTTPApistrap(Apistrap):
 
     _get_ui.apistrap_ignore = True
 
-    def _get_redoc(self, request: Request):
+    async def _get_redoc(self, request: Request):
         """
         Serves ReDoc
         """
