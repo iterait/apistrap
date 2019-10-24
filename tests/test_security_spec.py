@@ -97,7 +97,7 @@ def test_security_spec_non_string_scopes(app_with_oauth_non_string_scopes, clien
     assert response.json["paths"]["/secured"]["get"]["security"] == [{"oauth": ["read"]}]
 
 
-def test_security_spec_multiple_schemes_default():
+def test_security_spec_multiple_schemes_default(app, client):
     oapi = FlaskApistrap()
 
     scheme_1 = OAuthSecurity(
@@ -113,6 +113,24 @@ def test_security_spec_multiple_schemes_default():
     oapi.add_security_scheme(scheme_2, lambda _: None, default=True)
 
     assert oapi.default_security_scheme == scheme_2
+
+    @app.route("/secured", methods=["GET"])
+    @oapi.security("read")
+    def view_1():
+        pass
+
+    @app.route("/also_secured", methods=["GET"])
+    @oapi.security("read", scheme=scheme_1)
+    def view_2():
+        pass
+
+    oapi.init_app(app)
+
+    response = client.get("/spec.json")
+    assert response.status_code == 200
+
+    assert response.json["paths"]["/secured"]["get"]["security"] == [{"oauth_2": ["read"]}]
+    assert response.json["paths"]["/also_secured"]["get"]["security"] == [{"oauth_1": ["read"]}]
 
 
 def test_security_spec_multiple_schemes_default_conflict():
@@ -157,7 +175,7 @@ def test_security_spec_multiple_schemes_no_default(app, client):
 
     with pytest.raises(TypeError):
         oapi.init_app(app)
-        client.get("/asdf")
+        client.get("/spec.json")
 
 
 def test_security_spec_no_scheme(app, client):
@@ -172,4 +190,4 @@ def test_security_spec_no_scheme(app, client):
 
     with pytest.raises(TypeError):
         oapi.init_app(app)
-        client.get("/asdf")
+        client.get("/spec.json")
