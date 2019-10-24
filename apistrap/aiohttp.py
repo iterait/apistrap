@@ -18,7 +18,7 @@ from aiohttp.web_request import BaseRequest, Request
 from aiohttp.web_response import Response
 from aiohttp.web_urldispatcher import AbstractRoute, DynamicResource, PlainResource
 
-from apistrap.errors import ApiClientError
+from apistrap.errors import ApiClientError, UnsupportedMediaTypeError
 from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
 from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
@@ -93,16 +93,7 @@ class AioHTTPOperationWrapper(OperationWrapper):
             kwargs = {}
 
             if self.accepts_body:
-                self._check_request_content_type(request.content_type)
-
-                try:
-                    data = await request.json()
-                except json.decoder.JSONDecodeError as ex:
-                    raise ApiClientError("The request body must be a JSON object") from ex
-
-                if isinstance(data, str):
-                    raise ApiClientError("The request body must be a JSON object")
-
+                data = await self._load_request_body_primitive(request)
                 kwargs.update(self._load_request_body(data))
 
             for name, param_type in self._path_parameters.items():
@@ -135,6 +126,22 @@ class AioHTTPOperationWrapper(OperationWrapper):
             return web.Response(text=json.dumps(response.to_primitive()), content_type="application/json", status=code)
 
         return wrapper
+
+    async def _load_request_body_primitive(self, request: BaseRequest) -> dict:
+        if request.content_type == "application/json":
+            try:
+                data = await request.json()
+            except json.decoder.JSONDecodeError as ex:
+                raise ApiClientError("The request body must be a JSON object") from ex
+
+            if isinstance(data, str):
+                raise ApiClientError("The request body must be a JSON object")
+
+            return data
+        elif request.content_type in ("application/x-www-form-urlencoded", "multipart/form-data"):
+            return await request.post()
+
+        raise UnsupportedMediaTypeError()
 
     async def _stream_file_response(
         self, request: BaseRequest, response: FileResponse, code: int, mimetype: str = None
@@ -268,6 +275,7 @@ class AioHTTPApistrap(Apistrap):
         )
         self._default_error_handlers = [
             ErrorHandler(HTTPError, lambda exc_type: exc_type.status_code, self._handle_http_error),
+            ErrorHandler(UnsupportedMediaTypeError, 415, self._handle_client_error),
             ErrorHandler(ApiClientError, 400, self._handle_client_error),
             ErrorHandler(Exception, 500, self._handle_server_error),
         ]
