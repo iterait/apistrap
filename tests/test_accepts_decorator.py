@@ -6,7 +6,7 @@ from schematics import Model
 from schematics.types import IntType, StringType
 from werkzeug.test import Client
 
-from apistrap.errors import ApiClientError, InvalidFieldsError
+from apistrap.errors import InvalidFieldsError
 
 
 def extract_definition_name(definition_spec: str):
@@ -65,12 +65,13 @@ def test_request_parsing(app_with_accepts, client: Client):
     assert response.status_code == 200
 
 
-def test_unsupported_content_type(app_with_accepts, client: Client, propagate_exceptions):
-    with pytest.raises(ApiClientError):
-        client.post("/", data=json.dumps({
-            "string_field": "foo",
-            "int_field": 42
-        }))
+def test_unsupported_content_type(app_with_accepts, client: Client):
+    response = client.post("/", data=json.dumps({
+        "string_field": "foo",
+        "int_field": 42
+    }), content_type="text/plain")
+
+    assert response.status_code == 415
 
 
 @pytest.mark.parametrize("field", ["string_field", "int_field"])

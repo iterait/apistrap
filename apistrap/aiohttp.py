@@ -275,8 +275,8 @@ class AioHTTPApistrap(Apistrap):
         )
         self._default_error_handlers = [
             ErrorHandler(HTTPError, lambda exc_type: exc_type.status_code, self._handle_http_error),
-            ErrorHandler(ApiClientError, 400, self._handle_client_error),
             ErrorHandler(UnsupportedMediaTypeError, 415, self._handle_client_error),
+            ErrorHandler(ApiClientError, 400, self._handle_client_error),
             ErrorHandler(Exception, 500, self._handle_server_error),
         ]
 

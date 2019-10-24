@@ -127,8 +127,8 @@ class FlaskApistrap(Apistrap):
 
         self._default_error_handlers = (
             ErrorHandler(HTTPException, lambda exc_type: exc_type.code, self.http_error_handler),
-            ErrorHandler(ApiClientError, 400, self.error_handler),
             ErrorHandler(UnsupportedMediaTypeError, 415, self.error_handler),
+            ErrorHandler(ApiClientError, 400, self.error_handler),
             ErrorHandler(ApiServerError, 500, self.internal_error_handler),
             ErrorHandler(Exception, 500, self.internal_error_handler),
         )
