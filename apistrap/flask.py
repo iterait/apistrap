@@ -159,16 +159,16 @@ class FlaskApistrap(Apistrap):
 
         app.before_first_request_funcs.append(self._decorate_view_handlers)
 
-    def add_security_scheme(self, scheme: SecurityScheme, enforcer: SecurityEnforcer):
+    def add_security_scheme(self, scheme: SecurityScheme, enforcer: SecurityEnforcer, *, default: bool = False):
         """
         Add a security scheme to be used by the API.
 
         :param scheme: a description of the security scheme
         :param enforcer: a function that checks the requirements of the security scheme
+        :param default: should this be used as the default security scheme?
         """
 
-        self.security_schemes.append(scheme)
-        self.spec.components.security_scheme(scheme.name, scheme.to_openapi_dict())
+        self._add_security_scheme(scheme, default)
         self.security_enforcers[scheme] = enforcer
 
     def _error_handler(self, exception: Exception):

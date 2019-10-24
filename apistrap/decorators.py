@@ -7,7 +7,7 @@ from schematics import Model
 
 from apistrap.tags import TagData
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from apistrap.extension import SecurityScheme
 
 
