@@ -17,6 +17,7 @@ from aiohttp.web_exceptions import HTTPError
 from aiohttp.web_request import BaseRequest, Request
 from aiohttp.web_response import Response
 from aiohttp.web_urldispatcher import AbstractRoute, DynamicResource, PlainResource
+from aiohttp.web_ws import WebSocketResponse
 
 from apistrap.errors import ApiClientError, UnsupportedMediaTypeError
 from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
@@ -116,7 +117,7 @@ class AioHTTPOperationWrapper(OperationWrapper):
                 await self._wrapped_function(*bound.args, **bound.kwargs)
             )
 
-            if self.is_raw_response(response):
+            if self.is_raw_response(response) and not isinstance(response, WebSocketResponse):
                 response.set_status(code)
                 return response
 
