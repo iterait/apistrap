@@ -81,9 +81,11 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
         self._responses = self._get_responses()
 
-        self._request_body_parameter, self._request_body_class, self._request_body_content_types = (
-            self._get_request_body_parameter()
-        )
+        (
+            self._request_body_parameter,
+            self._request_body_class,
+            self._request_body_content_types,
+        ) = self._get_request_body_parameter()
 
         if self._request_body_content_types is None:
             self._request_body_content_types = ["application/json"]
