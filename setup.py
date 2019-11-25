@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 setup(name='apistrap',
-      version='0.9.6',
+      version='0.9.7',
       description='Iterait REST API utilities',
       classifiers=[
           'Development Status :: 4 - Beta',
