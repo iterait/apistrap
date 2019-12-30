@@ -8,7 +8,7 @@ from itertools import chain
 from typing import TYPE_CHECKING, Callable, Dict, Generator, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 
 from docstring_parser import parse as parse_doc
-from docstring_parser.parser.common import DocstringParam
+from docstring_parser.common import DocstringParam
 from schematics import Model
 from schematics.exceptions import DataError
 
