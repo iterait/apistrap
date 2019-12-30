@@ -24,7 +24,7 @@ setup(name='apistrap',
       zip_safe=False,
       setup_requires=['pytest-runner'],
       tests_require=['pytest', 'pytest-mock', 'pytest-flask', 'pytest-aiohttp', 'flask', 'aiohttp', 'numpy'],
-      install_requires=['apispec==1.2', 'schematics', 'more_itertools', 'Werkzeug', 'jinja2', 'docstring_parser>=0.3'],
+      install_requires=['apispec==1.2', 'schematics', 'more_itertools', 'Werkzeug', 'jinja2', 'docstring_parser>=0.5'],
       extras_require={
           'flask': ['flask'],
           'aiohttp': ['aiohttp'],
