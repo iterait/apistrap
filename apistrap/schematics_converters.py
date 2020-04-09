@@ -4,6 +4,7 @@ from inspect import getmro
 from typing import TYPE_CHECKING, Any, Dict, Generator, Optional, Type
 
 from schematics import Model
+from schematics.types import CompoundType, UnionType
 from schematics.types.base import (
     BaseType,
     BooleanType,
@@ -52,6 +53,30 @@ def _model_fields_to_schema_object_properties(model: Type[Model], apistrap: Opti
     return properties
 
 
+def _union_field_to_schema_object(field: UnionType, apistrap: Optional[Apistrap]) -> Dict[str, Any]:
+    """
+    Convert a union field to an OpenAPI 3 SchemaObject.
+
+    :param field: the field to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
+    :return: a schema
+    """
+
+    types = field._types.values()
+
+    schemas = []
+
+    for t in types:
+        schema = _field_to_schema_object(t, apistrap)
+        if schema not in schemas:  # sets cannot be used here because dicts are not hashable
+            schemas.append(schema)
+
+    if len(schemas) == 1:
+        return schemas.pop()
+
+    return {"oneOf": [*schemas]}
+
+
 def _field_to_schema_object(field: BaseType, apistrap: Optional[Apistrap]) -> Optional[Dict[str, Any]]:
     """
     Convert a field definition to OpenAPI 3 schema.
@@ -75,6 +100,8 @@ def _field_to_schema_object(field: BaseType, apistrap: Optional[Apistrap]) -> Op
             return _primitive_dict_to_schema_object(field)
     elif isinstance(field, StringType):
         return _string_field_to_schema_object(field, apistrap)
+    elif isinstance(field, UnionType):
+        return _union_field_to_schema_object(field, apistrap)
     elif isinstance(field, BaseType):
         return _primitive_field_to_schema_object(field)
 
