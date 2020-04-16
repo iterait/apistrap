@@ -1,5 +1,5 @@
 from schematics import Model
-from schematics.types import DictType, FloatType, IntType, ListType, ModelType, StringType, UnionType
+from schematics.types import DictType, IntType, ListType, ModelType, StringType
 
 from apistrap.schematics_converters import schematics_model_to_schema_object
 
@@ -174,20 +174,4 @@ def test_enum():
         "title": "ModelWithEnum",
         "type": "object",
         "properties": {"enum_field": {"type": "string", "enum": ["member_a", "member_b"]}},
-    }
-
-
-class ModelWithUnions(Model):
-    number_field = UnionType([IntType, FloatType])
-    string_field = UnionType([StringType, StringType])
-
-
-def test_unions():
-    assert schematics_model_to_schema_object(ModelWithUnions) == {
-        "title": "ModelWithUnions",
-        "type": "object",
-        "properties": {
-            "number_field": {"oneOf": [{"type": "integer"}, {"type": "number"}]},
-            "string_field": {"type": "string"},
-        },
     }

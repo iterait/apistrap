@@ -29,11 +29,15 @@ def format_exception(exception: Exception) -> Mapping[str, Any]:
     }
 
 
-def snake_to_camel(value):
+def snake_to_camel(value: str, *, uppercase_first: bool = False) -> str:
     """
     Convert a string from snake_case to camelCase
     """
     result = "".join(x.capitalize() or "_" for x in value.split("_"))
+
+    if uppercase_first:
+        return result
+
     return result[0].lower() + result[1:]
 
 
