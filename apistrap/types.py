@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from io import BytesIO
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Dict, Union
 from typing.io import BinaryIO
 
 from schematics.exceptions import BaseError, CompoundError, ValidationError
-from schematics.types import FloatType, ListType
+from schematics.types import BaseType, FloatType, ListType, ModelType, PolyModelType
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -115,3 +115,34 @@ class NonNanFloatType(FloatType):
                 raise ValidationError("The value is NaN")
             value = self._default_value
         return super().to_native(value, context)
+
+
+class DiscriminatedModelType(PolyModelType):
+    """
+    A Schematics field that converts to an "anyOf" model with a discriminator in OpenAPI schema.
+    """
+
+    def __init__(self, model_name: str, discriminator_field_name: str, type_map: Dict[str, ModelType], **kwargs):
+        super().__init__([*type_map.values()], **kwargs)
+        self._type_map = type_map
+        self._discriminator_field_name = discriminator_field_name
+        self._model_name = model_name
+
+    @property
+    def type_map(self):
+        return self._type_map
+
+    @property
+    def model_name(self):
+        return self._model_name
+
+    @property
+    def discriminator_field_name(self):
+        return self._discriminator_field_name
+
+
+class AnyType(BaseType):
+    """
+    A Schematics field that performs no validation/conversion and converts to an empty type in OpenAPI schema
+    (which means "any").
+    """
