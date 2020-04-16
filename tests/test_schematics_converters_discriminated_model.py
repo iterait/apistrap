@@ -26,6 +26,11 @@ class ModelWithDiscriminatedModel(Model):
     model_field = DiscriminatedModelType("TwoVariantModel", "type", {"a": VariantA, "b": VariantB})
 
 
+def test_discriminated_model_no_apistrap():
+    with pytest.raises(ValueError):
+        schematics_model_to_schema_object(ModelWithDiscriminatedModel)
+
+
 def test_discriminated_models(apistrap_extension):
     result = schematics_model_to_schema_object(ModelWithDiscriminatedModel, apistrap_extension)
     assert result == {"$ref": "#/components/schemas/ModelWithDiscriminatedModel"}
