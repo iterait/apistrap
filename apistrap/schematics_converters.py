@@ -4,6 +4,7 @@ from inspect import getmro
 from typing import TYPE_CHECKING, Any, Dict, Generator, Optional, Type
 
 from schematics import Model
+from schematics.types import UnionType
 from schematics.types.base import (
     BaseType,
     BooleanType,
@@ -14,8 +15,9 @@ from schematics.types.base import (
     NumberType,
     StringType,
 )
-from schematics.types.compound import DictType, ListType, ModelType
+from schematics.types.compound import DictType, ListType, ModelType, PolyModelType
 
+from apistrap.types import AnyType, DiscriminatedModelType
 from apistrap.utils import snake_to_camel
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -52,6 +54,71 @@ def _model_fields_to_schema_object_properties(model: Type[Model], apistrap: Opti
     return properties
 
 
+def _union_field_to_schema_object(field: UnionType, apistrap: Optional[Apistrap], name: str = None) -> Dict[str, Any]:
+    """
+    Convert a union field to an OpenAPI 3 SchemaObject.
+
+    :param field: the field to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
+    :return: a schema
+    """
+
+    if apistrap is None:
+        raise ValueError("Union fields cannot work without an apistrap instance")
+
+    types = field._types.values()
+    schemas = []
+
+    for t in types:
+        schema = _field_to_schema_object(t, apistrap)
+        if schema not in schemas:  # sets cannot be used here because dicts are not hashable
+            schemas.append(schema)
+
+    if len(schemas) == 1:
+        return schemas.pop()
+
+    return {
+        "$ref": apistrap.add_schema_definition(
+            snake_to_camel(f"{name or _get_serialized_name(field)}_union", uppercase_first=True), {"anyOf": schemas}
+        )
+    }
+
+
+def _poly_model_field_to_schema_object(field: PolyModelType, apistrap: Optional[Apistrap]) -> Dict[str, Any]:
+    """
+    Convert a poly model field to an OpenAPI 3 SchemaObject.
+
+    :param field: the field to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
+    :return: a schema
+    """
+    return {"anyOf": [schematics_model_to_schema_object(model, apistrap) for model in field.model_classes]}
+
+
+def _discriminated_model_field_to_schema_object(
+    field: DiscriminatedModelType, apistrap: Optional[Apistrap]
+) -> Dict[str, Any]:
+    """
+    Convert a discriminated model field to an OpenAPI 3 SchemaObject.
+
+    :param field: the field to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
+    :return: a schema
+    """
+    if apistrap is None:
+        raise ValueError("Discriminated model fields cannot work without an apistrap instance")
+
+    result = _poly_model_field_to_schema_object(field, apistrap)
+    result["discriminator"] = {
+        "propertyName": field.discriminator_field_name,
+        "mapping": {
+            key: schematics_model_to_schema_object(model, apistrap)["$ref"] for key, model in field.type_map.items()
+        },
+    }
+
+    return {"$ref": apistrap.add_schema_definition(field.model_name, result)}
+
+
 def _field_to_schema_object(field: BaseType, apistrap: Optional[Apistrap]) -> Optional[Dict[str, Any]]:
     """
     Convert a field definition to OpenAPI 3 schema.
@@ -71,10 +138,20 @@ def _field_to_schema_object(field: BaseType, apistrap: Optional[Apistrap]) -> Op
     elif isinstance(field, DictType):
         if isinstance(field.field, ModelType):
             return _model_dict_to_schema_object(field, apistrap)
+        elif isinstance(field.field, UnionType):
+            return _union_dict_to_schema_object(field, apistrap)
         elif isinstance(field.field, BaseType):
             return _primitive_dict_to_schema_object(field)
     elif isinstance(field, StringType):
         return _string_field_to_schema_object(field, apistrap)
+    elif isinstance(field, AnyType):
+        return {}
+    elif isinstance(field, UnionType):
+        return _union_field_to_schema_object(field, apistrap)
+    elif isinstance(field, DiscriminatedModelType):
+        return _discriminated_model_field_to_schema_object(field, apistrap)
+    elif isinstance(field, PolyModelType):
+        return _poly_model_field_to_schema_object(field, apistrap)
     elif isinstance(field, BaseType):
         return _primitive_field_to_schema_object(field)
 
@@ -211,6 +288,24 @@ def _model_dict_to_schema_object(field: DictType, apistrap: Optional[Apistrap]) 
     }
 
     schema.update(_extract_model_description(field))
+
+    return schema
+
+
+def _union_dict_to_schema_object(field: DictType, apistrap: Optional[Apistrap]) -> Dict[str, Any]:
+    """
+    Get a SchemaObject for a dictionary of given unions
+
+    :param field: the field to be converted
+    :param apistrap: the extension used for adding reusable schema definitions
+    :return: a SchemaObject
+    """
+
+    schema = {
+        "type": "object",
+        "title": f"Dictionary of {'|'.join(field.field.typenames)}",
+        "additionalProperties": _union_field_to_schema_object(field.field, apistrap, _get_serialized_name(field)),
+    }
 
     return schema
 
