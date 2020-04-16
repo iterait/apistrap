@@ -79,7 +79,7 @@ def _union_field_to_schema_object(field: UnionType, apistrap: Optional[Apistrap]
 
     return {
         "$ref": apistrap.add_schema_definition(
-            snake_to_camel(f"{name or _get_serialized_name(field)}_union", uppercase_first=True), {"anyOf": [*schemas]}
+            snake_to_camel(f"{name or _get_serialized_name(field)}_union", uppercase_first=True), {"anyOf": schemas}
         )
     }
 
