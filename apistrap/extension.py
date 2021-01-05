@@ -3,7 +3,7 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import Callable, Dict, List, Literal, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
@@ -421,7 +421,7 @@ class Apistrap(metaclass=ABCMeta):
         """
         return partial(self._decorate, IgnoreParamsDecorator(ignored_params))
 
-    def security(self, *scopes: str, scheme: SecurityScheme = None):
+    def security(self, *scopes: Union[str, Literal], scheme: SecurityScheme = None):
         """
         A decorator that enforces user authentication and authorization.
         """

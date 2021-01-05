@@ -287,7 +287,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
     def _postprocess_response(self, response: Union[Model, Tuple[Model, int]]) -> Tuple[Model, int, Optional[str]]:
         """
         Check response type and code and add the code if necessary.
-        
+
         :param response: response received from a view handler
         :return: a response and status code
         """

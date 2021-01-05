@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Type, Union
 
 from schematics import Model
 
@@ -82,5 +82,5 @@ class SecurityDecorator:
     Enforces user authentication and authorization.
     """
 
-    scopes: Sequence[str]
+    scopes: Sequence[Union[str, Literal]]
     security_scheme: Optional[SecurityScheme] = None
