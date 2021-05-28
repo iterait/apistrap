@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Optional, Sequence, Type, Union
 
 from schematics import Model
 
@@ -9,6 +9,7 @@ from apistrap.tags import TagData
 
 if TYPE_CHECKING:  # pragma: no cover
     from apistrap.extension import SecurityScheme
+    from apistrap.utils import StringLike
 
 
 class IgnoreDecorator:
@@ -82,5 +83,5 @@ class SecurityDecorator:
     Enforces user authentication and authorization.
     """
 
-    scopes: Sequence[Union[str, Literal]]
+    scopes: Sequence[StringLike]
     security_scheme: Optional[SecurityScheme] = None
