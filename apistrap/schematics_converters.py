@@ -140,6 +140,8 @@ def _field_to_schema_object(field: BaseType, apistrap: Optional[Apistrap]) -> Op
             return _model_dict_to_schema_object(field, apistrap)
         elif isinstance(field.field, UnionType):
             return _union_dict_to_schema_object(field, apistrap)
+        elif isinstance(field.field, ListType) and isinstance(field.field.field, ModelType):
+            return _dict_of_model_lists_to_schema_object(field, apistrap)
         elif isinstance(field.field, BaseType):
             return _primitive_dict_to_schema_object(field)
     elif isinstance(field, StringType):
@@ -310,18 +312,22 @@ def _union_dict_to_schema_object(field: DictType, apistrap: Optional[Apistrap]) 
     return schema
 
 
-def _primitive_array_to_schema_object(field: ListType) -> Dict[str, Any]:
+def _dict_of_model_lists_to_schema_object(field: DictType, apistrap: Optional[Apistrap]) -> Dict[str, Any]:
     """
-    Get a SchemaObject for a list of primitive types
+    Get a SchemaObject for a dictionary of model lists
 
     :param field: the field that determines the value type
     :return: a SchemaObject
     """
 
     schema = {
-        "type": "array",
-        "title": f"List of {field.field.__class__.__name__}",
-        "items": _field_to_schema_object(field.field, None),
+        "type": "object",
+        "title": f"Dictionary of {field.field.field._model_class.__name__} lists",
+        "additionalProperties": {
+            "type": "array",
+            "title": f"List of {field.field.field._model_class.__name__}",
+            "items": _field_to_schema_object(field.field.field, apistrap),
+        },
     }
 
     schema.update(_extract_model_description(field))
@@ -341,6 +347,25 @@ def _primitive_dict_to_schema_object(field: DictType) -> Dict[str, Any]:
         "type": "object",
         "title": f"Dictionary of {field.field.__class__.__name__}",
         "additionalProperties": _field_to_schema_object(field.field, None),
+    }
+
+    schema.update(_extract_model_description(field))
+
+    return schema
+
+
+def _primitive_array_to_schema_object(field: ListType) -> Dict[str, Any]:
+    """
+    Get a SchemaObject for a list of primitive types
+
+    :param field: the field that determines the value type
+    :return: a SchemaObject
+    """
+
+    schema = {
+        "type": "array",
+        "title": f"List of {field.field.__class__.__name__}",
+        "items": _field_to_schema_object(field.field, None),
     }
 
     schema.update(_extract_model_description(field))
