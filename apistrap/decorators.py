@@ -9,6 +9,7 @@ from apistrap.tags import TagData
 
 if TYPE_CHECKING:  # pragma: no cover
     from apistrap.extension import SecurityScheme
+    from apistrap.utils import StringLike
 
 
 class IgnoreDecorator:
@@ -82,5 +83,5 @@ class SecurityDecorator:
     Enforces user authentication and authorization.
     """
 
-    scopes: Sequence[str]
+    scopes: Sequence[StringLike]
     security_scheme: Optional[SecurityScheme] = None
