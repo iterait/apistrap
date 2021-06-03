@@ -1,7 +1,14 @@
+import pytest
 from schematics import Model
 from schematics.types import DictType, IntType, ListType, ModelType, StringType
 
+from apistrap.flask import FlaskApistrap
 from apistrap.schematics_converters import schematics_model_to_schema_object
+
+
+@pytest.fixture(scope="function")
+def apistrap_extension():
+    yield FlaskApistrap()
 
 
 class ExampleModel(Model):
@@ -140,7 +147,11 @@ class ModelWithDescriptions(Model):
 def test_schematics_to_schema_object_descriptions():
     assert schematics_model_to_schema_object(ModelWithDescriptions) == {
         "properties": {
-            "primitive": {"type": "integer", "title": "Primitive title", "description": "Primitive description",},
+            "primitive": {
+                "type": "integer",
+                "title": "Primitive title",
+                "description": "Primitive description",
+            },
             "list": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -174,4 +185,74 @@ def test_enum():
         "title": "ModelWithEnum",
         "type": "object",
         "properties": {"enum_field": {"type": "string", "enum": ["member_a", "member_b"]}},
+    }
+
+
+class ModelWithDictOfLists(Model):
+    data = DictType(ListType(StringType()))
+
+
+def test_schematics_to_schema_object_dict_of_lists():
+    assert schematics_model_to_schema_object(ModelWithDictOfLists) == {
+        "type": "object",
+        "title": "ModelWithDictOfLists",
+        "properties": {
+            "data": {
+                "type": "object",
+                "additionalProperties": {"type": "array", "items": {"type": "string"}, "title": "List of StringType"},
+                "title": "Dictionary of ListType",
+            }
+        },
+    }
+
+
+class ModelWithDictOfListsOfModels(Model):
+    data = DictType(ListType(ModelType(ExampleModel)))
+
+
+def test_schematics_to_schema_object_dict_of_lists_of_models():
+    assert schematics_model_to_schema_object(ModelWithDictOfListsOfModels) == {
+        "type": "object",
+        "title": "ModelWithDictOfListsOfModels",
+        "properties": {
+            "data": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "array",
+                    "items": {"type": "object", "title": "ExampleModel", "properties": {"string": {"type": "string"}}},
+                    "title": "List of ExampleModel",
+                },
+                "title": "Dictionary of ExampleModel lists",
+            }
+        },
+    }
+
+
+def test_schematics_to_schema_object_dict_of_lists_of_models_ref(apistrap_extension):
+    assert schematics_model_to_schema_object(ModelWithDictOfListsOfModels, apistrap_extension) == {
+        "$ref": "#/components/schemas/ModelWithDictOfListsOfModels",
+    }
+
+    definitions = apistrap_extension.to_openapi_dict()["components"]["schemas"]
+
+    assert definitions["ModelWithDictOfListsOfModels"] == {
+        "type": "object",
+        "title": "ModelWithDictOfListsOfModels",
+        "properties": {
+            "data": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "array",
+                    "items": {"$ref": "#/components/schemas/ExampleModel"},
+                    "title": "List of ExampleModel",
+                },
+                "title": "Dictionary of ExampleModel lists",
+            }
+        },
+    }
+
+    assert definitions["ExampleModel"] == {
+        "type": "object",
+        "title": "ExampleModel",
+        "properties": {"string": {"type": "string"}},
     }
