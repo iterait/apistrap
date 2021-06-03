@@ -222,7 +222,7 @@ def test_schematics_to_schema_object_dict_of_lists_of_models():
                     "items": {"type": "object", "title": "ExampleModel", "properties": {"string": {"type": "string"}}},
                     "title": "List of ExampleModel",
                 },
-                "title": "Dictionary of ListType",
+                "title": "Dictionary of ExampleModel lists",
             }
         },
     }
