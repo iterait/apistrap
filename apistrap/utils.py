@@ -1,8 +1,21 @@
 import inspect
 import traceback
-from typing import Any, Callable, Dict, Mapping, Type, Union
+from typing import Any, Callable, Dict, Mapping, Type, Union, TYPE_CHECKING
 
 from more_itertools import flatten
+
+
+try:
+    from typing import Protocol
+
+    class StringLike(Protocol):
+        def __str__(self) -> str:
+            ...
+except ImportError:
+    Protocol = None
+
+if not TYPE_CHECKING and Protocol is None:  # pragma: no cover
+    StringLike = str
 
 
 def format_exception(exception: Exception) -> Mapping[str, Any]:

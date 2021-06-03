@@ -51,9 +51,14 @@ jobs:
     docker:
       - image: circleci/python:3.8
 
+  test_py_39:
+    <<: *test_job
+    docker:
+      - image: circleci/python:3.9
+
   coverage:
     docker:
-      - image: circleci/python:3.8
+      - image: circleci/python:3.9
     working_directory: ~/apistrap
     steps:
       - checkout
@@ -75,10 +80,12 @@ workflows:
     jobs:
       - test_py_37
       - test_py_38
+      - test_py_39
       - coverage:
           requires:
             - test_py_37
             - test_py_38
+            - test_py_39
       - deploy:
           filters:
             branches:
@@ -86,6 +93,7 @@ workflows:
           requires:
             - test_py_37
             - test_py_38
+            - test_py_39
             - coverage
 
   nightly-build:
@@ -100,3 +108,4 @@ workflows:
     jobs:
       - test_py_37
       - test_py_38
+      - test_py_39
