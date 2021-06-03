@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import abc
 from abc import ABCMeta
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union, TYPE_CHECKING
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
@@ -22,6 +24,9 @@ from apistrap.decorators import (
 from apistrap.errors import ApistrapExtensionError
 from apistrap.schemas import ErrorResponse
 from apistrap.tags import TagData
+
+if TYPE_CHECKING:  # pragma: no cover
+    from apistrap.utils import StringLike
 
 
 class SecurityScheme(metaclass=ABCMeta):
@@ -421,7 +426,7 @@ class Apistrap(metaclass=ABCMeta):
         """
         return partial(self._decorate, IgnoreParamsDecorator(ignored_params))
 
-    def security(self, *scopes: str, scheme: SecurityScheme = None):
+    def security(self, *scopes: StringLike, scheme: SecurityScheme = None):
         """
         A decorator that enforces user authentication and authorization.
         """
