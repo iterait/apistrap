@@ -169,7 +169,10 @@ class AioHTTPOperationWrapper(OperationWrapper):
             if response.attachment_filename is None:
                 raise TypeError("Missing attachment filename")
 
-            headers["Content-Disposition"] = f"attachment,filename={response.attachment_filename}"
+            if "," in response.attachment_filename:
+                raise ValueError("Filename should not contain commas")
+
+            headers["Content-Disposition"] = f'attachment; filename="{response.attachment_filename}"'
 
         if isinstance(response.filename_or_fp, str) or isinstance(response.filename_or_fp, Path):
             return web.FileResponse(response.filename_or_fp, headers=headers, status=code)
