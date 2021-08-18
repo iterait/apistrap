@@ -98,11 +98,17 @@ class AioHTTPOperationWrapper(OperationWrapper):
 
             for name, param_type in self._path_parameters.items():
                 if name in request.match_info.keys():
-                    kwargs[name] = param_type(request.match_info[name])
+                    try:
+                        kwargs[name] = param_type(request.match_info[name])
+                    except ValueError:
+                        raise ApiClientError(f"Invalid value for parameter `{name}`")
 
             for name, param_type in self._query_parameters.items():
                 if name in request.rel_url.query.keys():
-                    kwargs[name] = param_type(request.query[name])
+                    try:
+                        kwargs[name] = param_type(request.query[name])
+                    except ValueError:
+                        raise ApiClientError(f"Invalid value for parameter `{name}`")
                 elif self._signature.parameters[name].default == inspect.Parameter.empty:
                     raise ApiClientError(f"Missing query parameter `{name}`")
 
