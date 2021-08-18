@@ -235,3 +235,10 @@ async def test_aiohttp_path_unannotated_parameter_arg_assignment(aiohttp_initial
     assert data == {
         "param": "42"
     }
+
+
+async def test_aiohttp_path_params_invalid_value(aiohttp_initialized_client, app_with_params_as_args):
+    client = await aiohttp_initialized_client(app_with_params_as_args)
+    response = await client.get("/a/foobar")
+
+    assert response.status == 400
