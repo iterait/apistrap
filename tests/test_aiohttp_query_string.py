@@ -77,3 +77,10 @@ async def test_flask_query_string_optional_params(app_with_qs_params, aiohttp_in
 
     assert json["a"] == "hello"
     assert json["b"] == 999
+
+
+async def test_flask_query_string_invalid_value(app_with_qs_params, aiohttp_initialized_client):
+    client = await aiohttp_initialized_client(app_with_qs_params)
+    response = await client.get("/?param_a=hello&param_b=something")
+
+    assert response.status == 400
