@@ -30,7 +30,6 @@ setup(
         "pytest-aiohttp",
         "flask<=1.1.4",
         "aiohttp",
-        "numpy",
         "markupsafe<2.0.0",
     ],
     install_requires=[
@@ -42,5 +41,5 @@ setup(
         "docstring_parser>=0.5",
         "markupsafe<2.0.0",
     ],
-    extras_require={"flask": ["flask<=1.1.4"], "aiohttp": ["aiohttp"], "NonNanFloatType": ["numpy"]},
+    extras_require={"flask": ["flask<=1.1.4"], "aiohttp": ["aiohttp"]},
 )
