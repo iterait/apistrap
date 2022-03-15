@@ -7,9 +7,10 @@ from os import path
 from typing import Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type
 
 from flask import Blueprint, Flask, Response, jsonify, render_template, request, send_file
+from pydantic import ValidationError
 from werkzeug.exceptions import HTTPException
 
-from apistrap.errors import ApiClientError, ApiServerError, UnsupportedMediaTypeError
+from apistrap.errors import ApiClientError, ApiServerError, InvalidResponseError, UnsupportedMediaTypeError
 from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
 from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
@@ -60,7 +61,10 @@ class FlaskOperationWrapper(OperationWrapper):
                 elif self._signature.parameters[name].default == inspect.Parameter.empty:
                     raise ApiClientError(f"Missing query parameter `{name}`")
 
-            response, code, mimetype = self._postprocess_response(self._wrapped_function(*args, **kwargs))
+            try:
+                response, code, mimetype = self._postprocess_response(self._wrapped_function(*args, **kwargs))
+            except ValidationError as e:
+                raise InvalidResponseError(e.errors())
 
             if self.is_raw_response(response):
                 return response, code
@@ -76,7 +80,7 @@ class FlaskOperationWrapper(OperationWrapper):
                     last_modified=response.last_modified,
                 )
 
-            response = jsonify(response.to_primitive())
+            response = jsonify(response.dict())
             response.status_code = code
             return response
 
@@ -179,7 +183,7 @@ class FlaskApistrap(Apistrap):
 
         info, code = response
 
-        return jsonify(info.to_primitive()), code
+        return jsonify(info.dict()), code
 
     def _get_default_error_handlers(self) -> Sequence[ErrorHandler]:
         return self._default_error_handlers
@@ -263,7 +267,7 @@ class FlaskApistrap(Apistrap):
             raise ValueError()  # pragma: no cover
 
         logging.exception(exception)
-        return ErrorResponse(dict(message=exception.description))
+        return ErrorResponse(message=exception.description)
 
     def error_handler(self, exception):
         """
@@ -274,9 +278,9 @@ class FlaskApistrap(Apistrap):
 
         if self._app.debug:
             logging.exception(exception)
-            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
+            return ErrorResponse(message=str(exception), debug_data=format_exception(exception))
 
-        return ErrorResponse(dict(message=str(exception)))
+        return ErrorResponse(message=str(exception))
 
     def internal_error_handler(self, exception):
         """
@@ -288,6 +292,6 @@ class FlaskApistrap(Apistrap):
         logging.exception(exception)
 
         if self._app.debug:
-            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
+            return ErrorResponse(message=str(exception), debug_data=format_exception(exception))
 
-        return ErrorResponse(dict(message="Internal server error"))
+        return ErrorResponse(message="Internal server error")

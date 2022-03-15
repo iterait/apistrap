@@ -41,7 +41,7 @@ async def app_with_oauth(request):
                 "/token",
             ),
         ),
-        request.param
+        request.param,
     )
 
     oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())
@@ -82,7 +82,7 @@ async def app_with_oauth_and_unsecured_endpoint(request):
                 "/token",
             ),
         ),
-        request.param
+        request.param,
     )
 
     oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())
@@ -114,13 +114,17 @@ async def test_security_enforcement_forbidden(app_with_oauth, aiohttp_initialize
     assert response.status == 403
 
 
-async def test_security_enforcement_unsecured_endpoint_spec(app_with_oauth_and_unsecured_endpoint, aiohttp_initialized_client):
+async def test_security_enforcement_unsecured_endpoint_spec(
+    app_with_oauth_and_unsecured_endpoint, aiohttp_initialized_client
+):
     client = await aiohttp_initialized_client(app_with_oauth_and_unsecured_endpoint)
     response = await client.get("/spec.json")
     assert response.status == 200
 
 
-async def test_security_enforcement_unsecured_endpoint(app_with_oauth_and_unsecured_endpoint, aiohttp_initialized_client):
+async def test_security_enforcement_unsecured_endpoint(
+    app_with_oauth_and_unsecured_endpoint, aiohttp_initialized_client
+):
     client = await aiohttp_initialized_client(app_with_oauth_and_unsecured_endpoint)
     response = await client.get("/unsecured")
     assert response.status == 200

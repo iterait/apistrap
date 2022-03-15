@@ -15,11 +15,9 @@ def app_without_request_param():
     routes = web.RouteTableDef()
     oapi.init_app(app)
 
-    @routes.get('/')
+    @routes.get("/")
     async def view():
-        return web.Response(content_type="application/json", text=json.dumps({
-            "status": "OK"
-        }))
+        return web.Response(content_type="application/json", text=json.dumps({"status": "OK"}))
 
     app.add_routes(routes)
 
@@ -28,14 +26,14 @@ def app_without_request_param():
 
 async def test_aiohttp_spec_no_request_param_spec(app_without_request_param, aiohttp_initialized_client):
     client = await aiohttp_initialized_client(app_without_request_param)
-    response = await client.get('/spec.json')
+    response = await client.get("/spec.json")
 
     assert response.status == 200
     data = await response.json()
-    assert 'paths' in data
-    assert '/' in data['paths']
+    assert "paths" in data
+    assert "/" in data["paths"]
 
-    response = await client.get('/spec.json')
+    response = await client.get("/spec.json")
 
     assert response.status == 200
     new_data = await response.json()
@@ -44,7 +42,7 @@ async def test_aiohttp_spec_no_request_param_spec(app_without_request_param, aio
 
 async def test_aiohttp_spec_no_request_param_invocation(app_without_request_param, aiohttp_initialized_client):
     client = await aiohttp_initialized_client(app_without_request_param)
-    response = await client.get('/')
+    response = await client.get("/")
 
     assert response.status == 200
     data = await response.json()
@@ -60,12 +58,9 @@ def app_with_params_as_args():
     routes = web.RouteTableDef()
     oapi.init_app(app)
 
-    @routes.get('/{param_a}/{param_b}')
+    @routes.get("/{param_a}/{param_b}")
     async def view(param_a: str, param_b: int):
-        return web.Response(content_type="application/json", text=json.dumps({
-            "a": param_a,
-            "b": param_b
-        }))
+        return web.Response(content_type="application/json", text=json.dumps({"a": param_a, "b": param_b}))
 
     app.add_routes(routes)
 
@@ -74,7 +69,7 @@ def app_with_params_as_args():
 
 async def test_aiohttp_path_params_as_args_spec(aiohttp_initialized_client, app_with_params_as_args):
     client = await aiohttp_initialized_client(app_with_params_as_args)
-    response = await client.get('/spec.json')
+    response = await client.get("/spec.json")
 
     assert response.status == 200
     data = await response.json()
@@ -96,10 +91,7 @@ async def test_aiohttp_path_params_as_args_arg_assignment(aiohttp_initialized_cl
     assert response.status == 200
     data = await response.json()
 
-    assert data == {
-        "a": "a",
-        "b": 42
-    }
+    assert data == {"a": "a", "b": 42}
 
 
 @pytest.fixture(scope="function")
@@ -110,12 +102,17 @@ def app_with_optional_parameter():
     routes = web.RouteTableDef()
     oapi.init_app(app)
 
-    @routes.get('/')
-    @routes.get('/{param}')
+    @routes.get("/")
+    @routes.get("/{param}")
     async def view(param: str = "Default"):
-        return web.Response(content_type="application/json", text=json.dumps({
-            "param": param,
-        }))
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(
+                {
+                    "param": param,
+                }
+            ),
+        )
 
     app.add_routes(routes)
 
@@ -160,12 +157,18 @@ async def test_aiohttp_path_param_multiple_request_parameters(aiohttp_initialize
     oapi.init_app(app)
 
     with pytest.raises(TypeError):
-        @routes.get('/')
-        @routes.get('/{param}')
+
+        @routes.get("/")
+        @routes.get("/{param}")
         async def view(request_1: Request, request_2: Request, param: str = "Default"):
-            return web.Response(content_type="application/json", text=json.dumps({
-                "param": param,
-            }))
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {
+                        "param": param,
+                    }
+                ),
+            )
 
         app.add_routes(routes)
 
@@ -181,11 +184,17 @@ async def test_aiohttp_path_param_unsupported_parameter(aiohttp_initialized_clie
     oapi.init_app(app)
 
     with pytest.raises(TypeError):
-        @routes.get('/{param}')
+
+        @routes.get("/{param}")
         async def view(param: dict):
-            return web.Response(content_type="application/json", text=json.dumps({
-                "param": param,
-            }))
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {
+                        "param": param,
+                    }
+                ),
+            )
 
         app.add_routes(routes)
 
@@ -201,11 +210,16 @@ def app_with_unannotated_parameter():
     routes = web.RouteTableDef()
     oapi.init_app(app)
 
-    @routes.get('/{param}')
+    @routes.get("/{param}")
     async def view(param):
-        return web.Response(content_type="application/json", text=json.dumps({
-            "param": param,
-        }))
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(
+                {
+                    "param": param,
+                }
+            ),
+        )
 
     app.add_routes(routes)
 
@@ -214,27 +228,25 @@ def app_with_unannotated_parameter():
 
 async def test_aiohttp_path_unannotated_parameter_spec(aiohttp_initialized_client, app_with_unannotated_parameter):
     client = await aiohttp_initialized_client(app_with_unannotated_parameter)
-    response = await client.get('/spec.json')
+    response = await client.get("/spec.json")
 
     assert response.status == 200
     data = await response.json()
 
     parameters = data["paths"]["/{param}"]["get"]["parameters"]
-    assert parameters == [
-        {"in": "path", "name": "param", "required": True, "schema": {"type": "string"}}
-    ]
+    assert parameters == [{"in": "path", "name": "param", "required": True, "schema": {"type": "string"}}]
 
 
-async def test_aiohttp_path_unannotated_parameter_arg_assignment(aiohttp_initialized_client, app_with_unannotated_parameter):
+async def test_aiohttp_path_unannotated_parameter_arg_assignment(
+    aiohttp_initialized_client, app_with_unannotated_parameter
+):
     client = await aiohttp_initialized_client(app_with_unannotated_parameter)
     response = await client.get("/42")
 
     assert response.status == 200
     data = await response.json()
 
-    assert data == {
-        "param": "42"
-    }
+    assert data == {"param": "42"}
 
 
 async def test_aiohttp_path_params_invalid_value(aiohttp_initialized_client, app_with_params_as_args):

@@ -14,7 +14,7 @@ def app_with_params_as_args():
     routes = web.RouteTableDef()
     oapi.init_app(app)
 
-    @routes.get('/{param_a}/{param_b}')
+    @routes.get("/{param_a}/{param_b}")
     async def view(param_a: str, param_b: int):
         """
         A cool view handler.
@@ -23,12 +23,9 @@ def app_with_params_as_args():
         :param param_b: Parameter B
         """
 
-        return web.Response(content_type="application/json", text=json.dumps({
-            "a": param_a,
-            "b": param_b
-        }))
+        return web.Response(content_type="application/json", text=json.dumps({"a": param_a, "b": param_b}))
 
-    @routes.get('/extended')
+    @routes.get("/extended")
     async def view_extended():
         """
         A summary.

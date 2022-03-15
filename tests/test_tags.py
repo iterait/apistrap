@@ -57,7 +57,4 @@ def test_tag_data(app_with_tag_data, client):
     assert "tags" in path
     assert path["tags"] == ["Tag"]
 
-    assert response.json["tags"] == [{
-        "name": "Tag",
-        "description": "Description"
-    }]
+    assert response.json["tags"] == [{"name": "Tag", "description": "Description"}]

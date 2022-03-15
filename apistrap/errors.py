@@ -1,4 +1,9 @@
-from typing import Dict, List
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Dict, List
+
+if TYPE_CHECKING:
+    from pydantic.error_wrappers import ErrorDict
 
 
 class ApistrapExtensionError(Exception):
@@ -53,6 +58,6 @@ class InvalidResponseError(ApiServerError):
     An exception raised when a view function returns a malformed response
     """
 
-    def __init__(self, errors: Dict[str, List[str]]):
+    def __init__(self, errors: List[ErrorDict]):
         super().__init__(f"Invalid input: `{str(errors)}`")
         self.errors = errors

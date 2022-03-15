@@ -32,7 +32,7 @@ def app_with_oauth(app):
                 "/token",
             ),
         ),
-        enforcer
+        enforcer,
     )
 
     oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())
@@ -69,7 +69,7 @@ def app_with_oauth_and_unsecured_endpoint(app):
                 "/token",
             ),
         ),
-        enforcer
+        enforcer,
     )
 
     oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())

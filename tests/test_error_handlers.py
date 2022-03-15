@@ -22,47 +22,47 @@ def app_with_errors(app, flask_apistrap):
 def test_http_error_handler(app_with_errors, client):
     response = client.get("/nonexistent_url")
     assert response.status_code == 404
-    assert 'debug_data' not in response.json
+    assert response.json["debug_data"] is None
 
 
 def test_http_error_handler_in_production(app_with_errors, client, app_in_production):
     response = client.get("/nonexistent_url")
     assert response.status_code == 404
-    assert 'debug_data' not in response.json
+    assert response.json["debug_data"] is None
 
 
 def test_client_error_handler(app_with_errors, client):
     response = client.get("/client_error")
     assert response.status_code == 400
-    assert 'debug_data' in response.json
-    assert response.json['debug_data']['exception_type'] == 'ApiClientError'
+    assert "debug_data" in response.json
+    assert response.json["debug_data"]["exception_type"] == "ApiClientError"
 
 
 def test_client_error_handler_in_production(app_with_errors, client, app_in_production):
     response = client.get("/client_error")
     assert response.status_code == 400
-    assert 'debug_data' not in response.json
+    assert response.json["debug_data"] is None
 
 
 def test_server_error_handler(app_with_errors, client):
     response = client.get("/server_error")
     assert response.status_code == 500
-    assert 'debug_data' in response.json
-    assert response.json['debug_data']['exception_type'] == 'ApiServerError'
+    assert "debug_data" in response.json
+    assert response.json["debug_data"]["exception_type"] == "ApiServerError"
 
 
 def test_server_error_handler_in_production(app_with_errors, client, app_in_production):
     response = client.get("/server_error")
     assert response.status_code == 500
-    assert 'debug_data' not in response.json
+    assert response.json["debug_data"] is None
 
 
 def test_internal_server_error_handler(app_with_errors, client):
     response = client.get("/internal_error")
     assert response.status_code == 500
     assert response.json["message"] == "Runtime error occurred"
-    assert 'debug_data' in response.json
-    assert response.json['debug_data']['exception_type'] == 'RuntimeError'
+    assert "debug_data" in response.json
+    assert response.json["debug_data"]["exception_type"] == "RuntimeError"
 
 
 def test_internal_server_error_handler_in_production(app_with_errors, client, app_in_production):

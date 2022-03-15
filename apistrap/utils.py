@@ -1,9 +1,8 @@
 import inspect
 import traceback
-from typing import Any, Callable, Dict, Mapping, Type, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, Mapping, Type, Union
 
 from more_itertools import flatten
-
 
 try:
     from typing import Protocol
@@ -11,6 +10,7 @@ try:
     class StringLike(Protocol):
         def __str__(self) -> str:
             ...
+
 except ImportError:
     Protocol = None
 

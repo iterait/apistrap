@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
-from schematics import Model
+from pydantic import BaseModel
 
-T = TypeVar("T", bound=Model)
+T = TypeVar("T", bound=BaseModel)
 
 
 @dataclass
@@ -44,7 +44,7 @@ def model_examples_to_openapi_dict(model: Type[ExamplesMixin]) -> Dict[str, Any]
     examples = {}
 
     for example in model.get_examples():
-        examples[example.name] = {"value": example.value.to_primitive()}
+        examples[example.name] = {"value": example.value.dict()}
 
         if example.summary is not None:
             examples[example.name]["summary"] = example.summary
