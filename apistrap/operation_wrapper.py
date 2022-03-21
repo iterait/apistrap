@@ -248,13 +248,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         try:
             body = self._request_body_class(**body_primitive)
         except ValidationError as ex:
-            errors = {}
-            for error_dict in ex.errors():
-                for loc in error_dict["loc"]:
-                    errors.setdefault(loc, [])
-                    errors[loc].append(error_dict["msg"])
-
-            raise InvalidFieldsError(errors) from ex
+            raise InvalidFieldsError.from_validation_error(ex) from ex
 
         return {self._request_body_parameter: body}
 
