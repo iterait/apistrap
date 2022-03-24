@@ -132,7 +132,7 @@ class AioHTTPOperationWrapper(OperationWrapper):
             if isinstance(response, FileResponse):
                 return await self._stream_file_response(request, response, code, mimetype)
 
-            return web.Response(text=json.dumps(response.dict()), content_type="application/json", status=code)
+            return web.Response(text=response.json(), content_type="application/json", status=code)
 
         return wrapper
 

@@ -183,7 +183,7 @@ class FlaskApistrap(Apistrap):
 
         info, code = response
 
-        return jsonify(info.dict()), code
+        return jsonify(json.loads(info.json())), code
 
     def _get_default_error_handlers(self) -> Sequence[ErrorHandler]:
         return self._default_error_handlers
