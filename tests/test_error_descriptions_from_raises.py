@@ -22,7 +22,7 @@ def app_with_raises(app):
 @pytest.fixture()
 def app_with_raises_and_handler(app):
     oapi = FlaskApistrap()
-    oapi.add_error_handler(KeyError, 515, lambda e: ErrorResponse())
+    oapi.add_error_handler(KeyError, 515, lambda e: ErrorResponse(message=""))
 
     @app.route("/", methods=["GET"])
     def view():

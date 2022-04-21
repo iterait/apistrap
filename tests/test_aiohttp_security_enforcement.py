@@ -44,7 +44,7 @@ async def app_with_oauth(request):
         request.param,
     )
 
-    oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())
+    oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse(message=""))
 
     @routes.get("/secured")
     @oapi.security("read")
@@ -85,7 +85,7 @@ async def app_with_oauth_and_unsecured_endpoint(request):
         request.param,
     )
 
-    oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())
+    oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse(message=""))
 
     @routes.get("/unsecured")
     async def unsecured():
