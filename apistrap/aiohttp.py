@@ -18,6 +18,7 @@ from aiohttp.web_request import BaseRequest, Request
 from aiohttp.web_response import Response
 from aiohttp.web_urldispatcher import AbstractRoute, DynamicResource, PlainResource
 from pydantic import ValidationError
+from pydantic.json import pydantic_encoder
 
 from apistrap.errors import ApiClientError, InvalidResponseError, UnsupportedMediaTypeError
 from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
@@ -274,7 +275,7 @@ class ErrorHandlerMiddleware:
         except Exception as ex:
             error_response, code = self.handle_error(ex)
 
-            return web.Response(text=json.dumps(error_response.dict()), content_type="application/json", status=code)
+            return web.Response(text=error_response.json(), content_type="application/json", status=code)
 
 
 class AioHTTPApistrap(Apistrap):
@@ -371,7 +372,11 @@ class AioHTTPApistrap(Apistrap):
         Serves the OpenAPI specification
         """
 
-        return web.Response(text=json.dumps(self.to_openapi_dict()), content_type="application/json", status=200)
+        return web.Response(
+            text=json.dumps(self.to_openapi_dict(), default=pydantic_encoder),
+            content_type="application/json",
+            status=200,
+        )
 
     _get_spec.apistrap_ignore = True
 

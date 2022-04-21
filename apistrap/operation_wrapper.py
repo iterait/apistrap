@@ -304,14 +304,6 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         if code not in self._responses[type(response)].keys():
             raise UnexpectedResponseError(type(response), code)
 
-        if isinstance(response, BaseModel):
-            try:
-                response.validate(
-                    response.dict()
-                )  # TODO as opposed to schematics, pydantic performs validation implicitly - maybe this is not needed
-            except ValidationError as ex:
-                raise InvalidResponseError(ex.errors()) from ex
-
         return response, code, self._responses[type(response)][code].mimetype
 
     def _get_param_doc(self, param_name: str) -> Optional[DocstringParam]:
@@ -367,6 +359,24 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
                 if "items" in property_schema and "$ref" in property_schema["items"]:
                     property_schema["items"]["$ref"] = adjust_ref(property_schema["items"]["$ref"])
+
+                if "additionalProperties" in property_schema:
+                    if "$ref" in property_schema["additionalProperties"]:
+                        property_schema["additionalProperties"]["$ref"] = adjust_ref(
+                            property_schema["additionalProperties"]["$ref"]
+                        )
+                    if (
+                        "items" in property_schema["additionalProperties"]
+                        and "$ref" in property_schema["additionalProperties"]["items"]
+                    ):
+                        property_schema["additionalProperties"]["items"]["$ref"] = adjust_ref(
+                            property_schema["additionalProperties"]["items"]["$ref"]
+                        )
+
+                if "allOf" in property_schema:
+                    for item in property_schema["allOf"]:
+                        if "$ref" in item:
+                            item["$ref"] = adjust_ref(item["$ref"])
 
     def _get_responses(self):
         """

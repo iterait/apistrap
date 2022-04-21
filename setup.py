@@ -1,6 +1,5 @@
 from setuptools import find_packages, setup
 
-
 setup(
     name="apistrap",
     version="0.9.11",
