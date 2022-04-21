@@ -8,7 +8,7 @@ class ErrorResponse(BaseModel):
     An error message wrapper
     """
 
-    message: str = ""
+    message: str
     debug_data: Optional[Dict[str, Any]] = None
 
 
