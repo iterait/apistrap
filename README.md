@@ -9,7 +9,7 @@
 This package contains utilities that take care of most of the tedious tasks in the implementation of an HTTP API with 
 Flask or AioHTTP:
 
-- request body validation using [Schematics](https://github.com/schematics/schematics)
+- request body validation using Pydantic
 - response serialization and validation
 - API documentation generation using OpenAPI v3 specifications (also with Swagger UI)
 
@@ -79,8 +79,7 @@ def endpoint(param_a: str, param_b: int = 5):  # Note that the request parameter
 ### Request Body Parsing
 
 ```python
-from schematics import Model
-from schematics.types import StringType
+from pydantic import BaseModel
 from flask import Flask, jsonify
 from apistrap.flask import FlaskApistrap
 
@@ -88,8 +87,8 @@ app = Flask(__name__)
 oapi = FlaskApistrap()
 oapi.init_app(app)
 
-class Request(Model):
-    some_field = StringType(required=True)
+class Request(BaseModel):
+    some_field: str
 
 @app.route("/<param>")
 @oapi.accepts(Request)
@@ -110,8 +109,7 @@ Note that the doc block will be parsed and used in the API specification as a de
 ### Response Declaration and Validation
 
 ```python
-from schematics import Model
-from schematics.types import StringType
+from pydantic import BaseModel
 from flask import Flask
 from apistrap.flask import FlaskApistrap
 
@@ -119,11 +117,11 @@ app = Flask(__name__)
 oapi = FlaskApistrap()
 oapi.init_app(app)
 
-class MyResponse(Model):
-    some_field = StringType(required=True)
+class MyResponse(BaseModel):
+    some_field: str
 
-class NotReadyResponse(Model):
-    status = StringType(required=True)
+class NotReadyResponse(BaseModel):
+    status: str
 
 @app.route("/")
 @oapi.responds_with(MyResponse, code=201)  # Code is optional
@@ -164,28 +162,6 @@ def view():
 ```
 
 In this example, you can see how to organize the endpoints in Swagger UI into categories determined by tags.
-
-### Documenting Schematics Models
-
-In order to have nice titles and descriptions in your specification, you have to write them in your Schematics models 
-like so:
-
-```python
-from schematics import Model
-from schematics.types import StringType
-
-class MyResponse(Model):
-    some_field = StringType(required=True, metadata={
-        "label": "Short, informative label (title in the spec)",
-        "description": "Extended description of the schema (description in the spec)"
-    })
-```
-
-Apistrap automatically picks this up and puts it in the specification.
-
-**Heads up**: When you use compound types (e.g. `ListType`) with a field type and not a field instance (e.g. 
-`ListType(StringType)` instead of `ListType(StringType())`), the metadata gets passed down to the `StringType`, 
-which might result in weird specification files and minor headaches. We suggest to always instantiate the field type.
 
 ## Running Tests
 
