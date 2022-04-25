@@ -12,11 +12,6 @@ def test_tag_data(client, app):
 
     assert len(response.json["tags"]) == 2
 
-    assert response.json["tags"][0] == {
-        "name": "Tag"
-    }
+    assert response.json["tags"][0] == {"name": "Tag"}
 
-    assert response.json["tags"][1] == {
-        "name": "Tag with description",
-        "description": "Description"
-    }
+    assert response.json["tags"][1] == {"name": "Tag with description", "description": "Description"}

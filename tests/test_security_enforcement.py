@@ -32,10 +32,10 @@ def app_with_oauth(app):
                 "/token",
             ),
         ),
-        enforcer
+        enforcer,
     )
 
-    oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())
+    oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse(message=""))
 
     @app.route("/secured", methods=["GET"])
     @oapi.security("read")
@@ -69,10 +69,10 @@ def app_with_oauth_and_unsecured_endpoint(app):
                 "/token",
             ),
         ),
-        enforcer
+        enforcer,
     )
 
-    oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse())
+    oapi.add_error_handler(ForbiddenRequestError, 403, lambda _: ErrorResponse(message=""))
 
     @app.route("/unsecured", methods=["GET"])
     def unsecured():

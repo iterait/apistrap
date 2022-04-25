@@ -1,19 +1,18 @@
-from typing import Any, Mapping
+from typing import Any, Dict, Optional
 
-from schematics import Model
-from schematics.types import BaseType, DictType, StringType
+from pydantic import BaseModel
 
 
-class ErrorResponse(Model):
+class ErrorResponse(BaseModel):
     """
     An error message wrapper
     """
 
-    message: str = StringType(required=True)
-    debug_data: Mapping[str, Any] = DictType(BaseType, required=False, serialize_when_none=False)
+    message: str
+    debug_data: Optional[Dict[str, Any]] = None
 
 
-class EmptyResponse(Model):
+class EmptyResponse(BaseModel):
     """
     An empty message wrapper
     """

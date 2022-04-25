@@ -16,8 +16,8 @@ def test_spec_url_repeated_call(app, client):
     response = client.get("/spec.json")
     assert response.status_code == 200
     data = response.json
-    assert 'paths' in data
-    assert '/' in data['paths']
+    assert "paths" in data
+    assert "/" in data["paths"]
 
     response = client.get("/spec.json")
     assert response.status_code == 200
@@ -28,27 +28,27 @@ def test_spec_url_ignore_params(app, client):
     oapi = FlaskApistrap()
     oapi.init_app(app)
 
-    @app.route('/view/<param>')
-    @oapi.ignore_params('param')
+    @app.route("/view/<param>")
+    @oapi.ignore_params("param")
     def view(param):
         return jsonify()
 
-    response = client.get('/spec.json')
+    response = client.get("/spec.json")
     assert response.status_code == 200
-    assert 'paths' in response.json
-    assert response.json['paths']['/view/{param}']['get']['parameters'] == []
+    assert "paths" in response.json
+    assert response.json["paths"]["/view/{param}"]["get"]["parameters"] == []
 
 
 def test_spec_url_ignore_endpoint(app, client):
     oapi = FlaskApistrap()
     oapi.init_app(app)
 
-    @app.route('/')
+    @app.route("/")
     @oapi.ignore()
     def view():
         return jsonify()
 
-    response = client.get('/spec.json')
+    response = client.get("/spec.json")
     assert response.status_code == 200
-    assert 'paths' in response.json
-    assert '/' not in response.json['paths']
+    assert "paths" in response.json
+    assert "/" not in response.json["paths"]

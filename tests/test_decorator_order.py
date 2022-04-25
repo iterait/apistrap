@@ -1,23 +1,23 @@
 import itertools
+from typing import Optional
 
 import pytest
 from flask import jsonify
-from schematics import Model
-from schematics.types import StringType
+from pydantic import BaseModel
 
 
-class Request(Model):
-    message = StringType()
+class Request(BaseModel):
+    message: Optional[str] = None
 
 
-class Response(Model):
-    message = StringType()
+class Response(BaseModel):
+    message: Optional[str] = None
 
 
 decorators = [
     lambda oapi: oapi.responds_with(Response, code=201),
     lambda oapi: oapi.accepts(Request),
-    lambda oapi: oapi.tags("Tag 1", "Tag 2")
+    lambda oapi: oapi.tags("Tag 1", "Tag 2"),
 ]
 
 

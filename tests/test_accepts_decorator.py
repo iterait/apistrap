@@ -2,8 +2,7 @@ import json
 
 import pytest
 from flask import jsonify
-from schematics import Model
-from schematics.types import IntType, StringType
+from pydantic import BaseModel, Extra
 from werkzeug.test import Client
 
 from apistrap.errors import InvalidFieldsError
@@ -13,9 +12,9 @@ def extract_definition_name(definition_spec: str):
     return definition_spec.split("/")[-1]
 
 
-class Request(Model):
-    string_field: str = StringType(required=True)
-    int_field: int = IntType(required=True)
+class Request(BaseModel, extra=Extra.forbid):
+    string_field: str
+    int_field: int
 
 
 @pytest.fixture()
@@ -43,33 +42,26 @@ def test_parameters_in_spec_json(app_with_accepts, client):
     ref = extract_definition_name(body["content"]["application/json"]["schema"]["$ref"])
     assert response.json["components"]["schemas"][ref] == {
         "title": Request.__name__,
+        "additionalProperties": False,
         "type": "object",
         "properties": {
-            "int_field": {
-                "type": "integer"
-            },
-            "string_field": {
-                "type": "string"
-            }
+            "int_field": {"type": "integer", "title": "Int Field"},
+            "string_field": {"type": "string", "title": "String Field"},
         },
-        "required": ["string_field", "int_field"]
+        "required": ["string_field", "int_field"],
     }
 
 
 def test_request_parsing(app_with_accepts, client: Client):
-    response = client.post("/", content_type="application/json", data=json.dumps({
-        "string_field": "foo",
-        "int_field": 42
-    }))
+    response = client.post(
+        "/", content_type="application/json", data=json.dumps({"string_field": "foo", "int_field": 42})
+    )
 
     assert response.status_code == 200
 
 
 def test_unsupported_content_type(app_with_accepts, client: Client):
-    response = client.post("/", data=json.dumps({
-        "string_field": "foo",
-        "int_field": 42
-    }), content_type="text/plain")
+    response = client.post("/", data=json.dumps({"string_field": "foo", "int_field": 42}), content_type="text/plain")
 
     assert response.status_code == 415
 
@@ -84,19 +76,18 @@ def test_missing_field(app_with_accepts, client: Client, field, propagate_except
 
 def test_unexpected_field(app_with_accepts, client: Client, propagate_exceptions):
     with pytest.raises(InvalidFieldsError):
-        client.post("/", content_type="application/json", data=json.dumps({
-            "string_field": "foo",
-            "int_field": 42,
-            "unexpected_field": "Spanish inquisition"
-        }))
+        client.post(
+            "/",
+            content_type="application/json",
+            data=json.dumps({"string_field": "foo", "int_field": 42, "unexpected_field": "Spanish inquisition"}),
+        )
 
 
 def test_invalid_field(app_with_accepts, client: Client, propagate_exceptions):
     with pytest.raises(InvalidFieldsError):
-        client.post("/", content_type="application/json", data=json.dumps({
-            "string_field": "foo",
-            "int_field": "Hello"
-        }))
+        client.post(
+            "/", content_type="application/json", data=json.dumps({"string_field": "foo", "int_field": "Hello"})
+        )
 
 
 @pytest.fixture()
@@ -165,23 +156,19 @@ def test_form_parameter_in_spec_json(app_with_accepts_form, client):
     assert response.json["components"]["schemas"][ref] == {
         "title": Request.__name__,
         "type": "object",
+        "additionalProperties": False,
         "properties": {
-            "int_field": {
-                "type": "integer"
-            },
-            "string_field": {
-                "type": "string"
-            }
+            "int_field": {"type": "integer", "title": "Int Field"},
+            "string_field": {"type": "string", "title": "String Field"},
         },
-        "required": ["string_field", "int_field"]
+        "required": ["string_field", "int_field"],
     }
 
 
 def test_accepting_form(app_with_accepts_form, client):
-    response = client.post("/", data={
-        "int_field": "42",
-        "string_field": "foo"
-    }, content_type="application/x-www-form-urlencoded")
+    response = client.post(
+        "/", data={"int_field": "42", "string_field": "foo"}, content_type="application/x-www-form-urlencoded"
+    )
 
     assert response.status_code == 200
     assert response.json == {}

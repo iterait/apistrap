@@ -17,8 +17,10 @@ from aiohttp.web_exceptions import HTTPError
 from aiohttp.web_request import BaseRequest, Request
 from aiohttp.web_response import Response
 from aiohttp.web_urldispatcher import AbstractRoute, DynamicResource, PlainResource
+from pydantic import ValidationError
+from pydantic.json import pydantic_encoder
 
-from apistrap.errors import ApiClientError, UnsupportedMediaTypeError
+from apistrap.errors import ApiClientError, InvalidResponseError, UnsupportedMediaTypeError
 from apistrap.extension import Apistrap, ErrorHandler, SecurityScheme
 from apistrap.operation_wrapper import OperationWrapper
 from apistrap.schemas import ErrorResponse
@@ -131,7 +133,7 @@ class AioHTTPOperationWrapper(OperationWrapper):
             if isinstance(response, FileResponse):
                 return await self._stream_file_response(request, response, code, mimetype)
 
-            return web.Response(text=json.dumps(response.to_primitive()), content_type="application/json", status=code)
+            return web.Response(text=response.json(), content_type="application/json", status=code)
 
         return wrapper
 
@@ -266,13 +268,14 @@ class ErrorHandlerMiddleware:
         :return: either the response of the handler or an error message response
         """
         try:
-            return await handler(request)
+            try:
+                return await handler(request)
+            except ValidationError as ex:
+                raise InvalidResponseError(ex.errors())
         except Exception as ex:
             error_response, code = self.handle_error(ex)
 
-            return web.Response(
-                text=json.dumps(error_response.to_primitive()), content_type="application/json", status=code
-            )
+            return web.Response(text=error_response.json(), content_type="application/json", status=code)
 
 
 class AioHTTPApistrap(Apistrap):
@@ -334,9 +337,9 @@ class AioHTTPApistrap(Apistrap):
         """
         logging.exception(exception)
         if asyncio.get_running_loop().get_debug():
-            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
+            return ErrorResponse(message=str(exception), debug_data=format_exception(exception))
         else:
-            return ErrorResponse(dict(message="Internal server error"))
+            return ErrorResponse(message="Internal server error")
 
     def _handle_client_error(self, exception):
         """
@@ -347,9 +350,9 @@ class AioHTTPApistrap(Apistrap):
         """
         if asyncio.get_running_loop().get_debug():
             logging.exception(exception)
-            return ErrorResponse(dict(message=str(exception), debug_data=format_exception(exception)))
+            return ErrorResponse(message=str(exception), debug_data=format_exception(exception))
         else:
-            return ErrorResponse(dict(message=str(exception)))
+            return ErrorResponse(message=str(exception))
 
     def _handle_http_error(self, exception: Exception):
         """
@@ -362,14 +365,18 @@ class AioHTTPApistrap(Apistrap):
             raise ValueError()  # pragma: no cover
 
         logging.exception(exception)
-        return ErrorResponse(dict(message=exception.text))
+        return ErrorResponse(message=exception.text)
 
     async def _get_spec(self, request: Request):
         """
         Serves the OpenAPI specification
         """
 
-        return web.Response(text=json.dumps(self.to_openapi_dict()), content_type="application/json", status=200)
+        return web.Response(
+            text=json.dumps(self.to_openapi_dict(), default=pydantic_encoder),
+            content_type="application/json",
+            status=200,
+        )
 
     _get_spec.apistrap_ignore = True
 

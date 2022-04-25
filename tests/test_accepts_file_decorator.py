@@ -23,19 +23,9 @@ def test_accepts_file_spec(app_with_accepts_file, client):
     paths = response.json["paths"]
 
     assert paths["/"]["post"]["requestBody"]["content"] == {
-        "application/octet-stream": {
-            "schema": {
-                "type": "string",
-                "format": "binary"
-            }
-        }
+        "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
     }
 
     assert paths["/image"]["post"]["requestBody"]["content"] == {
-        "image/png": {
-            "schema": {
-                "type": "string",
-                "format": "binary"
-            }
-        }
+        "image/png": {"schema": {"type": "string", "format": "binary"}}
     }
