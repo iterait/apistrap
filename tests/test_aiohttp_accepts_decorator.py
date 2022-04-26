@@ -3,13 +3,12 @@ import json
 import pytest
 from aiohttp import web
 from aiohttp.web_request import BaseRequest, Request
-from schematics import Model
-from schematics.types import IntType, StringType
+from pydantic import BaseModel
 
 
-class RequestModel(Model):
-    string_field: str = StringType(required=True)
-    int_field: int = IntType(required=True)
+class RequestModel(BaseModel):
+    string_field: str
+    int_field: int
 
 
 @pytest.fixture()
@@ -23,9 +22,7 @@ def app_with_accepts(aiohttp_apistrap):
         assert isinstance(aiohttp_request, BaseRequest)
         assert req.string_field == "foo"
         assert req.int_field == 42
-        return web.Response(content_type="application/json", text=json.dumps({
-            "status": "OK"
-        }))
+        return web.Response(content_type="application/json", text=json.dumps({"status": "OK"}))
 
     app.add_routes(routes)
     aiohttp_apistrap.init_app(app)
@@ -34,20 +31,18 @@ def app_with_accepts(aiohttp_apistrap):
 
 async def test_accepts(app_with_accepts, aiohttp_initialized_client):
     client = await aiohttp_initialized_client(app_with_accepts)
-    response = await client.post("/", headers={"content-type": "application/json"}, data=json.dumps({
-        "string_field": "foo",
-        "int_field": 42
-    }))
+    response = await client.post(
+        "/", headers={"content-type": "application/json"}, data=json.dumps({"string_field": "foo", "int_field": 42})
+    )
 
     assert response.status == 200
 
 
 async def test_unsupported_content_type(app_with_accepts, aiohttp_initialized_client):
     client = await aiohttp_initialized_client(app_with_accepts)
-    response = await client.post("/", data=json.dumps({
-        "string_field": "foo",
-        "int_field": 42
-    }), headers={"Content-Type": "text/plain"})
+    response = await client.post(
+        "/", data=json.dumps({"string_field": "foo", "int_field": 42}), headers={"Content-Type": "text/plain"}
+    )
 
     assert response.status == 415
 
@@ -68,9 +63,7 @@ def app_with_accepts_no_request_param(aiohttp_apistrap):
     async def view(req: RequestModel):
         assert req.string_field == "foo"
         assert req.int_field == 42
-        return web.Response(content_type="application/json", text=json.dumps({
-            "status": "OK"
-        }))
+        return web.Response(content_type="application/json", text=json.dumps({"status": "OK"}))
 
     app.add_routes(routes)
     aiohttp_apistrap.init_app(app)
@@ -79,10 +72,9 @@ def app_with_accepts_no_request_param(aiohttp_apistrap):
 
 async def test_accepts_no_request_param(app_with_accepts_no_request_param, aiohttp_initialized_client):
     client = await aiohttp_initialized_client(app_with_accepts_no_request_param)
-    response = await client.post("/", headers={"content-type": "application/json"}, data=json.dumps({
-        "string_field": "foo",
-        "int_field": 42
-    }))
+    response = await client.post(
+        "/", headers={"content-type": "application/json"}, data=json.dumps({"string_field": "foo", "int_field": 42})
+    )
 
     assert response.status == 200
 
@@ -124,10 +116,11 @@ async def test_form_parameter_in_spec_json(app_with_accepts_form, aiohttp_initia
 async def test_accepting_form(app_with_accepts_form, aiohttp_initialized_client):
     client = await aiohttp_initialized_client(app_with_accepts_form)
 
-    response = await client.post("/", data={
-        "int_field": "42",
-        "string_field": "foo"
-    }, headers={"Content-Type": "application/x-www-form-urlencoded"})
+    response = await client.post(
+        "/",
+        data={"int_field": "42", "string_field": "foo"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
 
     assert response.status == 200
     assert await response.json() == {}

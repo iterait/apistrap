@@ -5,11 +5,11 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 from apispec import APISpec
 from apispec.utils import OpenAPIVersion
-from schematics import Model
+from pydantic import BaseModel
 
 from apistrap.decorators import (
     AcceptsDecorator,
@@ -434,7 +434,7 @@ class Apistrap(metaclass=ABCMeta):
 
     def responds_with(
         self,
-        response_class: Type[Model],
+        response_class: Type[BaseModel],
         *,
         code: int = 200,
         description: Optional[str] = None,
@@ -446,7 +446,7 @@ class Apistrap(metaclass=ABCMeta):
         """
         return partial(self._decorate, RespondsWithDecorator(response_class, code, description, mimetype))
 
-    def accepts(self, request_class: Type[Model], mimetypes: Optional[Sequence[str]] = None):
+    def accepts(self, request_class: Type[BaseModel], mimetypes: Optional[Sequence[str]] = None):
         """
         A decorator that validates request bodies against a schema and passes it as an argument to the view function.
         The destination argument must be annotated with the request type.

@@ -1,19 +1,18 @@
 import pytest
 from flask import jsonify
-from schematics import Model
-from schematics.types import IntType
+from pydantic import BaseModel
 
 
 def extract_definition_name(definition_spec: str):
     return definition_spec.split("/")[-1]
 
 
-class CustomType(IntType):
+class CustomType(int):
     pass
 
 
-class RequestModel(Model):
-    field = CustomType(required=True)
+class RequestModel(BaseModel):
+    field: CustomType
 
 
 @pytest.fixture()
@@ -35,10 +34,6 @@ def test_int_subtype(client, app_with_accepts):
     assert spec["components"]["schemas"][ref] == {
         "title": "RequestModel",
         "type": "object",
-        "properties": {
-            "field": {
-                "type": "integer"
-            }
-        },
-        "required": ["field"]
+        "properties": {"field": {"type": "integer", "title": "Field"}},
+        "required": ["field"],
     }

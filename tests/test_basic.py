@@ -46,14 +46,15 @@ def test_path_params_present_in_spec_json(app_basic, client):
             "schema": {
                 "type": "string",
             },
-        }, {
+        },
+        {
             "in": "path",
             "name": "typed_param",
             "schema": {
                 "type": "integer",
             },
-            "required": True
-        }
+            "required": True,
+        },
     ]
 
 

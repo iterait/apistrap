@@ -1,8 +1,7 @@
 import io
 
 import pytest
-from schematics import Model
-from schematics.types import StringType
+from pydantic import BaseModel
 
 from apistrap.errors import InvalidResponseError, UnexpectedResponseError
 from apistrap.schemas import EmptyResponse
@@ -13,16 +12,16 @@ def extract_definition_name(definition_spec: str):
     return definition_spec.split("/")[-1]
 
 
-class OkResponse(Model):
-    string_field = StringType(required=True)
+class OkResponse(BaseModel):
+    string_field: str
 
 
-class WeirdResponse(Model):
-    string_field = StringType(required=True)
+class WeirdResponse(BaseModel):
+    string_field: str
 
 
-class ErrorResponse(Model):
-    error_message = StringType(required=True)
+class ErrorResponse(BaseModel):
+    error_message: str
 
 
 @pytest.fixture()
@@ -31,38 +30,38 @@ def app_with_responds_with(app, flask_apistrap):
     @flask_apistrap.responds_with(OkResponse)
     @flask_apistrap.responds_with(ErrorResponse, code=400)
     def view():
-        return OkResponse(dict(string_field="Hello World"))
+        return OkResponse(string_field="Hello World")
 
     @app.route("/description")
-    @flask_apistrap.responds_with(OkResponse, description='my description')
+    @flask_apistrap.responds_with(OkResponse, description="my description")
     def descriptive_view():
-        return OkResponse(dict(string_field="Hello descriptive World"))
+        return OkResponse(string_field="Hello descriptive World")
 
     @app.route("/error")
     @flask_apistrap.responds_with(OkResponse)
     @flask_apistrap.responds_with(ErrorResponse, code=400)
     def error_view():
-        return ErrorResponse(dict(error_message="Error"))
+        return ErrorResponse(error_message="Error")
 
     @app.route("/weird")
     @flask_apistrap.responds_with(OkResponse)
     @flask_apistrap.responds_with(ErrorResponse, code=400)
     def weird_view():
-        return WeirdResponse(dict(string_field="Hello World"))
+        return WeirdResponse(string_field="Hello World")
 
     @app.route("/invalid")
     @flask_apistrap.responds_with(OkResponse)
     @flask_apistrap.responds_with(ErrorResponse, code=400)
     def invalid_view():
-        return OkResponse(dict())
+        return OkResponse()
 
     @app.route("/file")
     @flask_apistrap.responds_with(FileResponse)
     def get_file():
-        message = 'hello'
-        return FileResponse(filename_or_fp=io.BytesIO(message.encode('UTF-8')),
-                            as_attachment=True,
-                            attachment_filename='hello.txt')
+        message = "hello"
+        return FileResponse(
+            filename_or_fp=io.BytesIO(message.encode("UTF-8")), as_attachment=True, attachment_filename="hello.txt"
+        )
 
     @app.route("/empty")
     @flask_apistrap.responds_with(EmptyResponse)
@@ -97,17 +96,15 @@ def test_responses_in_spec_json(app_with_responds_with, client):
     assert "200" in response.json["paths"]["/"]["get"]["responses"]
     assert "schema" in response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]
     assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"])
+    ref = extract_definition_name(
+        response.json["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+    )
 
     assert response.json["components"]["schemas"][ref] == {
         "title": "OkResponse",
         "type": "object",
-        "properties": {
-            "string_field": {
-                "type": "string"
-            }
-        },
-        "required": ["string_field"]
+        "properties": {"string_field": {"type": "string", "title": "String Field"}},
+        "required": ["string_field"],
     }
 
     # test default and custom descriptions
@@ -120,17 +117,15 @@ def test_responses_in_spec_json(app_with_responds_with, client):
     assert "400" in response.json["paths"]["/"]["get"]["responses"]
     assert "schema" in response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]
     assert "$ref" in response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]["schema"]
-    ref = extract_definition_name(response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]["schema"]["$ref"])
+    ref = extract_definition_name(
+        response.json["paths"]["/"]["get"]["responses"]["400"]["content"]["application/json"]["schema"]["$ref"]
+    )
 
     assert response.json["components"]["schemas"][ref] == {
         "title": "ErrorResponse",
         "type": "object",
-        "properties": {
-            "error_message": {
-                "type": "string"
-            }
-        },
-        "required": ["error_message"]
+        "properties": {"error_message": {"type": "string", "title": "Error Message"}},
+        "required": ["error_message"],
     }
 
 
@@ -161,7 +156,7 @@ def test_invalid_response(app_with_responds_with, client, propagate_exceptions):
 def test_file_response(app_with_responds_with, client):
     response = client.get("/file")
     assert response.status_code == 200
-    assert response.data == b'hello'
+    assert response.data == b"hello"
 
 
 def test_empty_response(app_with_responds_with, client):

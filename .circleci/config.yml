@@ -7,7 +7,7 @@ references:
       name: Install dependencies and apistrap on Archlinux
       command: |
         set -x
-        pip install --user coveralls "coverage<5.0"
+        pip install --user coveralls "coverage<5.0" Cython
         pip install --user .
 
   test: &test
@@ -51,6 +51,11 @@ jobs:
     docker:
       - image: circleci/python:3.9
 
+  test_py_310:
+    <<: *test_job
+    docker:
+      - image: circleci/python:3.10
+
   coverage:
     docker:
       - image: circleci/python:3.9
@@ -75,10 +80,12 @@ workflows:
     jobs:
       - test_py_38
       - test_py_39
+      - test_py_310
       - coverage:
           requires:
             - test_py_38
             - test_py_39
+            - test_py_310
       - deploy:
           filters:
             branches:
@@ -86,6 +93,7 @@ workflows:
           requires:
             - test_py_38
             - test_py_39
+            - test_py_310
             - coverage
 
   nightly-build:
@@ -100,3 +108,4 @@ workflows:
     jobs:
       - test_py_38
       - test_py_39
+      - test_py_310

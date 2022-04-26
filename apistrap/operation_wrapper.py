@@ -5,12 +5,12 @@ import inspect
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import TYPE_CHECKING, Callable, Dict, Generator, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 
 from docstring_parser import parse as parse_doc
 from docstring_parser.common import DocstringParam
-from schematics import Model
-from schematics.exceptions import DataError
+from pydantic import BaseModel, ValidationError
+from pydantic.utils import get_model
 
 from apistrap.decorators import (
     AcceptsDecorator,
@@ -24,7 +24,6 @@ from apistrap.decorators import (
 from apistrap.errors import InvalidFieldsError, InvalidResponseError, UnexpectedResponseError
 from apistrap.examples import ExamplesMixin, model_examples_to_openapi_dict
 from apistrap.schemas import ErrorResponse
-from apistrap.schematics_converters import schematics_model_to_schema_object
 from apistrap.tags import TagData
 from apistrap.types import FileResponse
 from apistrap.utils import resolve_fw_decl, snake_to_camel
@@ -56,8 +55,8 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         :param function: The view handler function to be processed
         :param decorators: The decorators present on the function
         """
-        self._responses: Dict[Type[Model], Dict[int, ResponseData]] = defaultdict(lambda: {})
-        self._request_body_class: Optional[Type[Model]] = None
+        self._responses: Dict[Type[BaseModel], Dict[int, ResponseData]] = defaultdict(lambda: {})
+        self._request_body_class: Optional[Type[BaseModel]] = None
         self._request_body_parameter: Optional[str] = None
         self._request_body_file_type: Optional[str] = None
         self._request_body_content_types: Optional[Sequence[str]] = None
@@ -160,8 +159,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
             spec["requestBody"] = {
                 "content": {
-                    mimetype: {"schema": schematics_model_to_schema_object(self._request_body_class, self._extension)}
-                    for mimetype in mimetypes
+                    mimetype: {"schema": self._process_model_schema(self._request_body_class)} for mimetype in mimetypes
                 },
                 "required": True,
             }
@@ -196,11 +194,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
                 else:
                     spec["responses"][str(code)] = {
                         "description": response_data.description or response_class.__name__,
-                        "content": {
-                            "application/json": {
-                                "schema": schematics_model_to_schema_object(response_class, self._extension)
-                            }
-                        },
+                        "content": {"application/json": {"schema": self._process_model_schema(response_class)}},
                     }
 
                     if issubclass(response_class, ExamplesMixin):
@@ -241,7 +235,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         """
         return self._request_body_parameter is not None
 
-    def _load_request_body(self, body_primitive) -> Dict[str, Model]:
+    def _load_request_body(self, body_primitive) -> Dict[str, BaseModel]:
         """
         Load the request body as an object with a fixed schema from a primitive data object (dict structure).
 
@@ -251,16 +245,14 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         if self._request_body_parameter is None or self._request_body_class is None:
             raise ValueError("The endpoint doesn't accept a request body")
 
-        body = self._request_body_class.__new__(self._request_body_class)
-
         try:
-            body.__init__(body_primitive, validate=True, partial=False, strict=True)
-        except DataError as ex:
-            raise InvalidFieldsError(ex.errors) from ex
+            body = self._request_body_class(**body_primitive)
+        except ValidationError as ex:
+            raise InvalidFieldsError.from_validation_error(ex) from ex
 
         return {self._request_body_parameter: body}
 
-    def _get_required_scopes(self) -> Generator[Tuple[SecurityScheme, Sequence[str]]]:
+    def _get_required_scopes(self) -> Generator[Tuple[SecurityScheme, Sequence[str]], None, None]:
         """
         Get a list of scopes required by the endpoint.
         """
@@ -284,7 +276,9 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             )
             yield scheme, security_decorator.scopes
 
-    def _postprocess_response(self, response: Union[Model, Tuple[Model, int]]) -> Tuple[Model, int, Optional[str]]:
+    def _postprocess_response(
+        self, response: Union[BaseModel, Tuple[BaseModel, int]]
+    ) -> Tuple[BaseModel, int, Optional[str]]:
         """
         Check response type and code and add the code if necessary.
 
@@ -309,12 +303,6 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
         if code not in self._responses[type(response)].keys():
             raise UnexpectedResponseError(type(response), code)
-
-        if isinstance(response, Model):
-            try:
-                response.validate()
-            except DataError as ex:
-                raise InvalidResponseError(ex.errors) from ex
 
         return response, code, self._responses[type(response)][code].mimetype
 
@@ -343,11 +331,58 @@ class OperationWrapper(metaclass=abc.ABCMeta):
             if isinstance(decorator, decorator_class):
                 yield decorator
 
+    def _process_model_schema(self, model: Type[BaseModel]) -> Dict[str, Any]:
+        schema_dict = get_model(model).schema()
+
+        self._process_model_schema_definitions(schema_dict)
+
+        name = self._extension.add_schema_definition(model.__name__, schema_dict)
+        return {"$ref": name}
+
+    def _process_model_schema_definitions(self, schema_dict: Dict[str, Any]):
+        if "definitions" in schema_dict:
+            definitions = schema_dict.pop("definitions")
+            for name, definition in definitions.items():
+                self._process_model_schema_definitions(definition)
+                self._extension.add_schema_definition(name, definition)
+
+        def adjust_ref(ref: str):
+            if ref.startswith("#/definitions/"):
+                return f"#/components/schemas/{ref[14:]}"
+
+            return ref
+
+        if "properties" in schema_dict:
+            for property_schema in schema_dict["properties"].values():
+                if "$ref" in property_schema:
+                    property_schema["$ref"] = adjust_ref(property_schema["$ref"])
+
+                if "items" in property_schema and "$ref" in property_schema["items"]:
+                    property_schema["items"]["$ref"] = adjust_ref(property_schema["items"]["$ref"])
+
+                if "additionalProperties" in property_schema:
+                    if "$ref" in property_schema["additionalProperties"]:
+                        property_schema["additionalProperties"]["$ref"] = adjust_ref(
+                            property_schema["additionalProperties"]["$ref"]
+                        )
+                    if (
+                        "items" in property_schema["additionalProperties"]
+                        and "$ref" in property_schema["additionalProperties"]["items"]
+                    ):
+                        property_schema["additionalProperties"]["items"]["$ref"] = adjust_ref(
+                            property_schema["additionalProperties"]["items"]["$ref"]
+                        )
+
+                if "allOf" in property_schema:
+                    for item in property_schema["allOf"]:
+                        if "$ref" in item:
+                            item["$ref"] = adjust_ref(item["$ref"])
+
     def _get_responses(self):
         """
         Find all possible response classes and codes for the underyling endpoint.
         """
-        result: Dict[Type[Model], Dict[int, ResponseData]] = defaultdict(lambda: {})
+        result: Dict[Type[BaseModel], Dict[int, ResponseData]] = defaultdict(lambda: {})
 
         for response_class, code, data in chain(
             self._get_response_from_annotation(),
@@ -361,7 +396,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
         return result
 
-    def _get_response_from_annotation(self) -> Generator[Tuple[Type[Model], int, ResponseData], None, None]:
+    def _get_response_from_annotation(self) -> Generator[Tuple[Type[BaseModel], int, ResponseData], None, None]:
         """
         Get the response class specified by the return value annotation of the view handler.
         """
@@ -372,19 +407,19 @@ class OperationWrapper(metaclass=abc.ABCMeta):
 
         annotation = resolve_fw_decl(self._wrapped_function, annotation)
 
-        if not issubclass(annotation, Model):
+        if not issubclass(annotation, BaseModel):
             raise TypeError("Unsupported return type")
 
         yield annotation, 200, ResponseData(self._doc.returns.description if self._doc.returns else None)
 
-    def _get_responses_from_decorators(self) -> Generator[Tuple[Type[Model], int, ResponseData], None, None]:
+    def _get_responses_from_decorators(self) -> Generator[Tuple[Type[BaseModel], int, ResponseData], None, None]:
         """
         Get the response classes specified by @responds_with decorators.
         """
         for decorator in self._find_decorators(RespondsWithDecorator):
             yield decorator.response_class, decorator.code, ResponseData(decorator.description, decorator.mimetype)
 
-    def _get_responses_from_raises(self) -> Generator[Tuple[Type[Model], int, ResponseData], None, None]:
+    def _get_responses_from_raises(self) -> Generator[Tuple[Type[BaseModel], int, ResponseData], None, None]:
         """
         Get response classes specified by 'raises' blocks in the docblock of the view handler.
         """
@@ -415,7 +450,7 @@ class OperationWrapper(metaclass=abc.ABCMeta):
         for param in self._signature.parameters.values():
             annotation = resolve_fw_decl(self._wrapped_function, param.annotation)
             matches_decorator = accepts_decorator and accepts_decorator.request_class == annotation
-            is_model = (not accepts_decorator) and issubclass(annotation, Model)
+            is_model = (not accepts_decorator) and issubclass(annotation, BaseModel)
 
             if matches_decorator or is_model:
                 if body_param is not None:

@@ -22,7 +22,7 @@ def app_with_raises(app):
 @pytest.fixture()
 def app_with_raises_and_handler(app):
     oapi = FlaskApistrap()
-    oapi.add_error_handler(KeyError, 515, lambda e: ErrorResponse())
+    oapi.add_error_handler(KeyError, 515, lambda e: ErrorResponse(message=""))
 
     @app.route("/", methods=["GET"])
     def view():
@@ -41,13 +41,7 @@ def test_error_descriptions_from_raises(app_with_raises, client):
     assert response.json["paths"]["/"]["get"]["responses"] == {
         "500": {
             "description": "KeyError description",
-            "content": {
-                "application/json": {
-                    "schema": {
-                        "$ref": "#/components/schemas/ErrorResponse"
-                    }
-                }
-            }
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
         }
     }
 
@@ -58,12 +52,6 @@ def test_http_code_from_handler(app_with_raises_and_handler, client):
     assert response.json["paths"]["/"]["get"]["responses"] == {
         "515": {
             "description": "KeyError description",
-            "content": {
-                "application/json": {
-                    "schema": {
-                        "$ref": "#/components/schemas/ErrorResponse"
-                    }
-                }
-            }
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}},
         }
     }

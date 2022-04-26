@@ -1,15 +1,15 @@
 import pytest
 from flask import jsonify
-from schematics import Model
+from pydantic import BaseModel
 
 
-class Request(Model):
+class Request(BaseModel):
     """
     Request body
     """
 
 
-class Response(Model):
+class Response(BaseModel):
     """
     Response body
     """
@@ -17,7 +17,7 @@ class Response(Model):
 
 @pytest.fixture(scope="function")
 def app_with_params_as_args(app, flask_apistrap):
-    @app.route('/<param_a>/<param_b>', methods=["get"])
+    @app.route("/<param_a>/<param_b>", methods=["get"])
     def view(param_a: str, param_b: int):
         """
         A cool view handler.
@@ -26,12 +26,9 @@ def app_with_params_as_args(app, flask_apistrap):
         :param param_b: Parameter B
         """
 
-        return jsonify({
-            "a": param_a,
-            "b": param_b
-        })
+        return jsonify({"a": param_a, "b": param_b})
 
-    @app.route('/extended', methods=["get"])
+    @app.route("/extended", methods=["get"])
     def view_extended():
         """
         A summary.
@@ -39,7 +36,7 @@ def app_with_params_as_args(app, flask_apistrap):
         An extended description.
         """
 
-    @app.route('/body', methods=["post"])
+    @app.route("/body", methods=["post"])
     def view_body(body: Request):
         """
         A summary.
@@ -49,7 +46,7 @@ def app_with_params_as_args(app, flask_apistrap):
         :param body: Request body description
         """
 
-    @app.route('/response', methods=["get"])
+    @app.route("/response", methods=["get"])
     def view_response() -> Response:
         """
         A summary.

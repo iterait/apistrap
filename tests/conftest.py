@@ -7,7 +7,7 @@ from apistrap.aiohttp import AioHTTPApistrap
 from apistrap.flask import FlaskApistrap
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def app():
     app = Flask(__name__)
     app.testing = True
@@ -19,7 +19,7 @@ def app():
         yield app
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def flask_apistrap(app):
     apistrap = FlaskApistrap()
     apistrap.init_app(app)
@@ -40,7 +40,7 @@ def aiohttp_apistrap():
     yield AioHTTPApistrap()
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def propagate_exceptions(app, mocker: MockFixture):
     def reraise(e):
         raise e
@@ -49,7 +49,7 @@ def propagate_exceptions(app, mocker: MockFixture):
     handle.side_effect = reraise
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def app_in_production(app):
     app.debug = False
     app.testing = False

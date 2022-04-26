@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Sequence, Type, Union
 
-from schematics import Model
+from pydantic import BaseModel
 
 from apistrap.tags import TagData
 
@@ -33,7 +33,7 @@ class RespondsWithDecorator:
     Specifies the format of the response. The response is automatically validated by Apistrap.
     """
 
-    response_class: Type[Model]
+    response_class: Type[BaseModel]
     code: int = 200
     description: Optional[str] = None
     mimetype: Optional[str] = None
@@ -46,7 +46,7 @@ class AcceptsDecorator:
     The destination parameter must be annotated with a corresponding type.
     """
 
-    request_class: Type[Model]
+    request_class: Type[BaseModel]
     mimetypes: Sequence[str] = ("application/json",)
 
 

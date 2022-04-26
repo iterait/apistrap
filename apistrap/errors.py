@@ -1,4 +1,11 @@
-from typing import Dict, List
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Dict, List
+
+from pydantic import ValidationError
+
+if TYPE_CHECKING:
+    from pydantic.error_wrappers import ErrorDict
 
 
 class ApistrapExtensionError(Exception):
@@ -28,6 +35,16 @@ class InvalidFieldsError(ApiClientError):
         super().__init__(f"Invalid input: `{str(errors)}`")
         self.errors = errors
 
+    @classmethod
+    def from_validation_error(cls, ex: ValidationError):
+        errors = {}
+        for error_dict in ex.errors():
+            for loc in error_dict["loc"]:
+                errors.setdefault(loc, [])
+                errors[loc].append(error_dict["msg"])
+
+        return InvalidFieldsError(errors)
+
 
 class ApiServerError(Exception):
     """
@@ -53,6 +70,6 @@ class InvalidResponseError(ApiServerError):
     An exception raised when a view function returns a malformed response
     """
 
-    def __init__(self, errors: Dict[str, List[str]]):
+    def __init__(self, errors: List[ErrorDict]):
         super().__init__(f"Invalid input: `{str(errors)}`")
         self.errors = errors
